@@ -1,0 +1,29 @@
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+target/
+.mvn/repository/
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+*.iws
+*.ipr
+out/
+
+### Visual Studio Code ###
+.factorypath
+
+### Environment ###
+.env
+.env.*
+!.env.example

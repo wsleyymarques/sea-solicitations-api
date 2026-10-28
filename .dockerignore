@@ -1,0 +1,16 @@
+.git
+.gitignore
+.idea
+.vscode
+*.iml
+
+.env
+.env.*
+!.env.example
+
+target
+.mvn/repository
+
+.DS_Store
+README.md
+compose.yaml
