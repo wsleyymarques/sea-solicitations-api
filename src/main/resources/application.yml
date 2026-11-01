@@ -39,3 +39,9 @@ management:
     web:
       exposure:
         include: health,info,prometheus
+
+security:
+  jwt:
+    issuer: ${JWT_ISSUER:sea-solicitations-api}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:1h}
+    secret: ${JWT_SECRET:}

@@ -20,7 +20,16 @@ O projeto segue um monolito modular com arquitetura hexagonal pragmatica, organi
 ```text
 br.com.sea.solicitations
 |-- user/
-|   `-- domain/
+|   |-- domain/
+|   |-- application/
+|   |   |-- port/
+|   |   |   |-- in/
+|   |   |   `-- out/
+|   |   `-- service/
+|   `-- adapter/
+|       |-- in/web/
+|       |-- out/
+|       `-- config/
 |-- solicitation/
 |   `-- domain/
 |-- audit/
@@ -28,10 +37,20 @@ br.com.sea.solicitations
 |-- outbox/
 |   `-- domain/
 `-- shared/
-    `-- domain/
+    |-- domain/
+    `-- adapter/
 ```
 
-Cada modulo recebera pacotes `application` e `adapter` somente quando existirem casos de uso, portas ou adapters reais. Isso evita interfaces e pastas vazias criadas apenas por convencao.
+O modulo `user` ja possui um fluxo vertical completo, desde os endpoints HTTP
+ate os adapters de persistencia, senha e JWT. Os modulos `solicitation`,
+`audit` e `outbox` ainda possuem principalmente suas fundacoes de dominio.
+Cada modulo recebe pacotes `application` e `adapter` somente quando existem
+casos de uso, portas ou adapters reais, evitando abstracoes e pastas vazias
+criadas apenas por convencao.
+
+A linguagem do negocio esta em [CONTEXT.md](CONTEXT.md). O projeto evolui em
+marcos funcionais sem datas fixas, conforme o
+[roteiro de estudo e implementacao](docs/superpowers/specs/2026-10-28-study-implementation-roadmap-design.md).
 
 ## Executando os testes
 
@@ -45,7 +64,12 @@ Crie o arquivo local de variaveis de ambiente:
 
 ```bash
 cp .env.example .env
+openssl rand -base64 32
 ```
+
+Copie o valor gerado para `JWT_SECRET` no `.env`. A aplicacao exige uma chave
+Base64 que decodifique para pelo menos 32 bytes e falha na inicializacao quando
+a configuracao e insegura.
 
 Suba a aplicacao, o PostgreSQL e o Elasticsearch:
 
@@ -94,6 +118,41 @@ Os servicos ficarao disponiveis em:
 - Healthcheck da API: `http://localhost:8080/actuator/health`
 - PostgreSQL: `localhost:5432`
 - Elasticsearch: `http://localhost:9200`
+
+## Autenticacao JWT
+
+Cadastre um cliente:
+
+```bash
+curl --request POST http://localhost:8080/auth/register \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "Joao Souza",
+    "email": "joao@example.com",
+    "password": "StrongPassword@123"
+  }'
+```
+
+Autentique o usuario:
+
+```bash
+curl --request POST http://localhost:8080/auth/login \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "email": "joao@example.com",
+    "password": "StrongPassword@123"
+  }'
+```
+
+A resposta contem `accessToken`, `tokenType` e `expiresIn`. Nas rotas
+protegidas, envie o token no cabecalho:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+O JWT e assinado com HS256 e contem o ID do usuario em `sub`, alem das claims
+`role` e `coveredStates`. A aplicacao nao cria sessao no servidor.
 
 Para acompanhar os logs:
 
