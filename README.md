@@ -1,5 +1,7 @@
 # Solicitations API
 
+[![CI](https://github.com/wsleyymarques/sea-solicitations-api/actions/workflows/ci.yml/badge.svg)](https://github.com/wsleyymarques/sea-solicitations-api/actions/workflows/ci.yml)
+
 API REST do desafio backend para gerenciamento de solicitacoes de atendimento.
 
 ## Stack inicial
@@ -57,6 +59,26 @@ marcos funcionais sem datas fixas, conforme o
 ```bash
 ./mvnw test
 ```
+
+## Integracao continua
+
+O workflow [CI](.github/workflows/ci.yml) e executado em todo `push` e
+`pull_request`. O job `verify` configura o Java 21, reutiliza o cache Maven e
+executa, nesta ordem:
+
+1. `./mvnw --batch-mode --no-transfer-progress verify`;
+2. `docker compose --env-file .env.example config --quiet`;
+3. `docker build --tag sea-solicitations-api:ci .`.
+
+Quando a pipeline falha, ela tenta disponibilizar os relatorios Surefire como
+artifact por sete dias, sem transformar a ausencia de relatorios em uma nova
+falha. As actions oficiais sao fixadas por SHA e o `GITHUB_TOKEN` possui apenas
+permissao de leitura do conteudo do repositorio.
+
+Depois que o workflow estiver na branch `main`, um ruleset do GitHub pode exigir
+o status do job `verify` antes de permitir o merge. A configuracao fica em
+`Settings > Rules > Rulesets` e transforma o CI em uma barreira efetiva contra
+codigo que nao compila, testes quebrados ou imagens Docker que nao constroem.
 
 ## Ambiente com Docker Compose
 
