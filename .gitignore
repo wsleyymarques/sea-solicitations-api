@@ -18,7 +18,7 @@ target/
 ### IntelliJ IDEA ###
 *.iws
 *.ipr
-out/
+/out/
 
 ### Visual Studio Code ###
 .factorypath
