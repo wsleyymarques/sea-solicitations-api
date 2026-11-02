@@ -43,12 +43,13 @@ br.com.sea.solicitations
     `-- adapter/
 ```
 
-O modulo `user` ja possui um fluxo vertical completo, desde os endpoints HTTP
-ate os adapters de persistencia, senha e JWT. Os modulos `solicitation`,
-`audit` e `outbox` ainda possuem principalmente suas fundacoes de dominio.
-Cada modulo recebe pacotes `application` e `adapter` somente quando existem
-casos de uso, portas ou adapters reais, evitando abstracoes e pastas vazias
-criadas apenas por convencao.
+Os modulos `user` e `solicitation` possuem fluxos verticais completos. Em
+`solicitation`, os casos de uso dependem de portas proprias e nao conhecem JPA,
+HTTP nem ViaCEP; os adapters implementam essas fronteiras. Os modulos `audit` e
+`outbox` ainda possuem principalmente suas fundacoes de dominio. Cada modulo
+recebe pacotes `application` e `adapter` somente quando existem casos de uso,
+portas ou adapters reais, evitando abstracoes e pastas vazias criadas apenas
+por convencao.
 
 A linguagem do negocio esta em [CONTEXT.md](CONTEXT.md). O projeto evolui em
 marcos funcionais sem datas fixas, conforme o
@@ -175,6 +176,46 @@ Authorization: Bearer <accessToken>
 
 O JWT e assinado com HS256 e contem o ID do usuario em `sub`, alem das claims
 `role` e `coveredStates`. A aplicacao nao cria sessao no servidor.
+
+## Solicitacoes
+
+Crie a solicitacao com os dados basicos usando um token de `CLIENT`:
+
+```bash
+curl --request POST http://localhost:8080/solicitations \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "serviceType": "INSTALLATION",
+    "title": "Instalacao de equipamento",
+    "description": "Solicito a instalacao de um novo equipamento no endereco informado."
+  }'
+```
+
+Complete a etapa de endereco com o ID devolvido. O cliente fornece apenas CEP,
+numero e complemento; logradouro, bairro, cidade e UF sao consultados no
+ViaCEP e nao podem ser substituidos pelo corpo da requisicao:
+
+```bash
+curl --request PUT http://localhost:8080/solicitations/<solicitationId>/address \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "postalCode": "01001-000",
+    "number": "100",
+    "complement": "Apto 12"
+  }'
+```
+
+O endpoint responde `200 OK` com a solicitacao ainda em `DRAFT`, a etapa
+`CONFIRMATION` e o endereco completo. Somente o cliente proprietario pode
+alterar a solicitacao. CEP inexistente produz `422`; indisponibilidade do
+provedor produz `503`, sem persistir um endereco parcial. Uma edicao concorrente
+do mesmo rascunho produz `409`, evitando sobrescrever a versao mais recente.
+
+A integracao usa, por padrao, `https://viacep.com.br`, timeout de conexao de
+`2s` e timeout de leitura de `3s`. Os valores podem ser alterados com
+`VIACEP_BASE_URL`, `VIACEP_CONNECT_TIMEOUT` e `VIACEP_READ_TIMEOUT`.
 
 Para acompanhar os logs:
 

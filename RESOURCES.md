@@ -12,6 +12,10 @@
   Fonte oficial para validacao de JWT Bearer e protecao dos endpoints.
 - [Docker Docs: variaveis e interpolacao no Compose](https://docs.docker.com/compose/how-tos/environment-variables/variable-interpolation/)
   Fonte oficial para `.env`, valores obrigatorios, defaults e `docker compose config`.
+- [Spring Boot: REST Clients](https://docs.spring.io/spring-boot/reference/io/rest-client.html)
+  Fonte oficial para o `RestClient.Builder` auto-configurado usado pelo adapter sincrono.
+- [ViaCEP](https://viacep.com.br/)
+  Contrato oficial do endpoint de CEP, incluindo CEP inexistente com `erro=true`.
 
 ## Wisdom (Communities)
 
@@ -19,4 +23,5 @@ Nenhuma comunidade externa foi selecionada. Durante o desafio, priorizar documen
 
 ## Gaps
 
-Adicionar fontes oficiais de JPA, Flyway, ViaCEP, Elasticsearch, Testcontainers, Micrometer e OpenAPI apenas quando o marco correspondente comecar.
+Adicionar fontes oficiais de JPA, Flyway, Elasticsearch, Testcontainers,
+Micrometer e OpenAPI apenas quando o marco correspondente comecar.
