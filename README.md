@@ -217,6 +217,27 @@ A integracao usa, por padrao, `https://viacep.com.br`, timeout de conexao de
 `2s` e timeout de leitura de `3s`. Os valores podem ser alterados com
 `VIACEP_BASE_URL`, `VIACEP_CONNECT_TIMEOUT` e `VIACEP_READ_TIMEOUT`.
 
+Depois do endereco, complete a confirmacao:
+
+```bash
+curl --request PUT http://localhost:8080/solicitations/<solicitationId>/confirmation \
+  --header 'Authorization: Bearer <accessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "priority": "HIGH",
+    "preferredDate": "2099-01-01",
+    "estimatedValue": 100.00,
+    "termsAccepted": true
+  }'
+```
+
+A data preferida deve ser hoje ou futura, os termos precisam ser aceitos e o
+valor estimado nao pode ser negativo. Para prioridade `HIGH`, o valor e
+obrigatorio e deve ser de pelo menos `100.00`; para `LOW` e `MEDIUM`, ele e
+opcional. A resposta permanece em `DRAFT`, agora com `currentStep` igual a
+`COMPLETED`. Enquanto nao houver submissao, o cliente proprietario pode editar
+a confirmacao repetindo o `PUT`.
+
 Para acompanhar os logs:
 
 ```bash
