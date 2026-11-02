@@ -17,4 +17,13 @@ public record CreateSolicitationRequest(
         @Size(min = 20, max = 1000, message = "Description must have between 20 and 1000 characters")
         String description
 ) {
+
+    public CreateSolicitationRequest {
+        title = normalize(title);
+        description = normalize(description);
+    }
+
+    private static String normalize(String value) {
+        return value == null ? null : value.trim();
+    }
 }

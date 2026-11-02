@@ -116,6 +116,29 @@ class SolicitationControllerTest {
     }
 
     @Test
+    void rejectsBasicDataThatIsTooShortAfterTrimming() throws Exception {
+        mockMvc.perform(post("/solicitations")
+                        .with(jwt()
+                                .jwt(token -> token.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_CLIENT")))
+                        .contentType(APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "serviceType": "INSTALLATION",
+                                  "title": " ab ",
+                                  "description": "short               "
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.violations.length()").value(2))
+                .andExpect(jsonPath("$.violations[0].field").value("description"))
+                .andExpect(jsonPath("$.violations[1].field").value("title"));
+
+        verifyNoInteractions(createSolicitationUseCase);
+    }
+
+    @Test
     void rejectsUnknownServiceTypeAsMalformedJson() throws Exception {
         mockMvc.perform(post("/solicitations")
                         .with(jwt()
