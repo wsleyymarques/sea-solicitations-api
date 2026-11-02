@@ -20,9 +20,13 @@ import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicit
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationResult;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationUseCase;
+import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationCommand;
+import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationResult;
+import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationUseCase;
 import br.com.sea.solicitations.solicitation.domain.Priority;
 import br.com.sea.solicitations.solicitation.domain.SolicitationStatus;
 import br.com.sea.solicitations.solicitation.domain.SolicitationStep;
+import br.com.sea.solicitations.solicitation.domain.exception.IncompleteSolicitationException;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +81,9 @@ class SolicitationControllerTest {
 
     @MockitoBean
     private CompleteSolicitationConfirmationUseCase completeSolicitationConfirmationUseCase;
+
+    @MockitoBean
+    private SubmitSolicitationUseCase submitSolicitationUseCase;
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
@@ -527,6 +534,112 @@ class SolicitationControllerTest {
                         .value("/solicitations/" + solicitationId + "/confirmation"));
     }
 
+    @Test
+    void submitsSolicitationForAuthenticatedOwner() throws Exception {
+        UUID clientId = UUID.randomUUID();
+        UUID solicitationId = UUID.randomUUID();
+        Instant submittedAt = Instant.parse("2000-01-01T12:00:00Z");
+        when(submitSolicitationUseCase.submit(any(SubmitSolicitationCommand.class)))
+                .thenReturn(new SubmitSolicitationResult(
+                        solicitationId,
+                        SolicitationStatus.SUBMITTED,
+                        SolicitationStep.COMPLETED,
+                        submittedAt
+                ));
+
+        mockMvc.perform(post("/solicitations/{id}/submit", solicitationId)
+                        .with(jwt()
+                                .jwt(token -> token.subject(clientId.toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(solicitationId.toString()))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.currentStep").value("COMPLETED"))
+                .andExpect(jsonPath("$.submittedAt").value("2000-01-01T12:00:00Z"));
+
+        ArgumentCaptor<SubmitSolicitationCommand> commandCaptor =
+                ArgumentCaptor.forClass(SubmitSolicitationCommand.class);
+        verify(submitSolicitationUseCase).submit(commandCaptor.capture());
+        assertThat(commandCaptor.getValue().solicitationId()).isEqualTo(solicitationId);
+        assertThat(commandCaptor.getValue().clientId()).isEqualTo(clientId);
+    }
+
+    @Test
+    void rejectsMalformedSolicitationIdBeforeCallingSubmitUseCase() throws Exception {
+        mockMvc.perform(post("/solicitations/not-a-uuid/submit")
+                        .with(jwt()
+                                .jwt(token -> token.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.violations[0].field").value("id"))
+                .andExpect(jsonPath("$.violations[0].message").value("must be a valid UUID"));
+
+        verifyNoInteractions(submitSolicitationUseCase);
+    }
+
+    @Test
+    void returnsMissingStagesWhenSolicitationIsIncomplete() throws Exception {
+        UUID solicitationId = UUID.randomUUID();
+        when(submitSolicitationUseCase.submit(any(SubmitSolicitationCommand.class)))
+                .thenThrow(new IncompleteSolicitationException(java.util.List.of(
+                        SolicitationStep.BASIC_DATA,
+                        SolicitationStep.ADDRESS,
+                        SolicitationStep.CONFIRMATION
+                )));
+
+        mockMvc.perform(post("/solicitations/{id}/submit", solicitationId)
+                        .with(jwt()
+                                .jwt(token -> token.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INCOMPLETE_SOLICITATION"))
+                .andExpect(jsonPath("$.message").value("Solicitation is incomplete"))
+                .andExpect(jsonPath("$.path")
+                        .value("/solicitations/" + solicitationId + "/submit"))
+                .andExpect(jsonPath("$.violations.length()").value(3))
+                .andExpect(jsonPath("$.violations[0].field").value("basicData"))
+                .andExpect(jsonPath("$.violations[1].field").value("address"))
+                .andExpect(jsonPath("$.violations[2].field").value("confirmation"));
+    }
+
+    @Test
+    void returnsNotFoundWhenSubmittingUnknownSolicitation() throws Exception {
+        assertSubmitError(new SolicitationNotFoundException(), 404, "SOLICITATION_NOT_FOUND");
+    }
+
+    @Test
+    void returnsForbiddenWhenSubmittingAnotherClientsSolicitation() throws Exception {
+        assertSubmitError(new SolicitationAccessDeniedException(), 403, "SOLICITATION_ACCESS_DENIED");
+    }
+
+    @Test
+    void returnsConflictWhenSubmittingANonDraftSolicitation() throws Exception {
+        assertSubmitError(
+                new InvalidSolicitationStateException("Only draft solicitations can be submitted"),
+                409,
+                "INVALID_SOLICITATION_STATE"
+        );
+    }
+
+    @Test
+    void returnsConflictWhenPreferredDateExpiredBeforeSubmission() throws Exception {
+        assertSubmitError(
+                new InvalidSolicitationStateException("Preferred date cannot be in the past"),
+                409,
+                "INVALID_SOLICITATION_STATE"
+        );
+    }
+
+    @Test
+    void returnsConflictWhenSubmissionWasUpdatedConcurrently() throws Exception {
+        assertSubmitError(
+                new SolicitationConcurrentUpdateException(),
+                409,
+                "SOLICITATION_CONCURRENT_UPDATE"
+        );
+    }
+
     private void assertAddressError(
             RuntimeException exception,
             int expectedStatus,
@@ -569,6 +682,26 @@ class SolicitationControllerTest {
                 .andExpect(jsonPath("$.violations[0].field").value(expectedField));
 
         verifyNoInteractions(completeSolicitationConfirmationUseCase);
+    }
+
+    private void assertSubmitError(
+            RuntimeException exception,
+            int expectedStatus,
+            String expectedCode
+    ) throws Exception {
+        UUID solicitationId = UUID.randomUUID();
+        when(submitSolicitationUseCase.submit(any(SubmitSolicitationCommand.class)))
+                .thenThrow(exception);
+
+        mockMvc.perform(post("/solicitations/{id}/submit", solicitationId)
+                        .with(jwt()
+                                .jwt(token -> token.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
+                .andExpect(status().is(expectedStatus))
+                .andExpect(jsonPath("$.status").value(expectedStatus))
+                .andExpect(jsonPath("$.code").value(expectedCode))
+                .andExpect(jsonPath("$.path")
+                        .value("/solicitations/" + solicitationId + "/submit"));
     }
 
     @TestConfiguration(proxyBeanMethods = false)

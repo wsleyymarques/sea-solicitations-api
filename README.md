@@ -238,6 +238,25 @@ opcional. A resposta permanece em `DRAFT`, agora com `currentStep` igual a
 `COMPLETED`. Enquanto nao houver submissao, o cliente proprietario pode editar
 a confirmacao repetindo o `PUT`.
 
+Quando as tres etapas estiverem completas, envie a solicitacao:
+
+```bash
+curl --request POST http://localhost:8080/solicitations/<solicitationId>/submit \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+A submissao nao recebe corpo e responde `200 OK` com `status` igual a
+`SUBMITTED`, `currentStep` igual a `COMPLETED` e o instante `submittedAt`.
+Somente o cliente proprietario pode submeter o proprio rascunho. A API valida
+novamente a data preferida no momento da submissao, pois ela pode ter se
+tornado passada desde o preenchimento da confirmacao.
+
+Uma solicitacao incompleta responde `409 INCOMPLETE_SOLICITATION` e informa em
+`violations` quais etapas ainda faltam (`basicData`, `address` e/ou
+`confirmation`). Tentar submeter novamente ou submeter um rascunho cuja data
+preferida expirou responde `409 INVALID_SOLICITATION_STATE`. Atualizacoes
+concorrentes tambem respondem `409`, sem sobrescrever a versao persistida.
+
 Para acompanhar os logs:
 
 ```bash

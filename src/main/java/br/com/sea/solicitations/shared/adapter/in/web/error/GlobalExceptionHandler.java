@@ -6,6 +6,8 @@ import br.com.sea.solicitations.solicitation.application.exception.PostalCodeSer
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationAccessDeniedException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationConcurrentUpdateException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationNotFoundException;
+import br.com.sea.solicitations.solicitation.domain.SolicitationStep;
+import br.com.sea.solicitations.solicitation.domain.exception.IncompleteSolicitationException;
 import br.com.sea.solicitations.user.application.exception.EmailAlreadyRegisteredException;
 import br.com.sea.solicitations.user.application.exception.InvalidCredentialsException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -169,6 +171,28 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IncompleteSolicitationException.class)
+    public ResponseEntity<ApiErrorResponse> handleIncompleteSolicitation(
+            IncompleteSolicitationException exception,
+            HttpServletRequest request
+    ) {
+        List<ApiErrorResponse.FieldViolation> violations = exception.missingSteps()
+                .stream()
+                .map(step -> new ApiErrorResponse.FieldViolation(
+                        submissionField(step),
+                        "must be completed before submission"
+                ))
+                .toList();
+
+        return response(
+                HttpStatus.CONFLICT,
+                "INCOMPLETE_SOLICITATION",
+                exception.getMessage(),
+                request,
+                violations
+        );
+    }
+
     @ExceptionHandler(InvalidSolicitationStateException.class)
     public ResponseEntity<ApiErrorResponse> handleInvalidSolicitationState(
             InvalidSolicitationStateException exception,
@@ -271,5 +295,16 @@ public class GlobalExceptionHandler {
                 violations
         );
         return ResponseEntity.status(status).body(body);
+    }
+
+    private String submissionField(SolicitationStep step) {
+        return switch (step) {
+            case BASIC_DATA -> "basicData";
+            case ADDRESS -> "address";
+            case CONFIRMATION -> "confirmation";
+            case COMPLETED -> throw new IllegalStateException(
+                    "Completed cannot be a missing solicitation step"
+            );
+        };
     }
 }

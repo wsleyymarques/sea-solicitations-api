@@ -1,6 +1,7 @@
 package br.com.sea.solicitations.solicitation.domain;
 
 import br.com.sea.solicitations.shared.domain.FederativeUnit;
+import br.com.sea.solicitations.solicitation.domain.exception.IncompleteSolicitationException;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -9,6 +10,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SolicitationTest {
@@ -94,6 +96,41 @@ class SolicitationTest {
         ))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("High priority requires an estimated value of at least 100.00");
+    }
+
+    @Test
+    void reportsEveryMissingStageInOrderWhenSubmissionIsIncomplete() {
+        Solicitation solicitation = new Solicitation(UUID.randomUUID());
+
+        assertThatExceptionOfType(IncompleteSolicitationException.class)
+                .isThrownBy(() -> solicitation.submit(TODAY, NOW))
+                .satisfies(exception -> assertThat(exception.missingSteps()).containsExactly(
+                        SolicitationStep.BASIC_DATA,
+                        SolicitationStep.ADDRESS,
+                        SolicitationStep.CONFIRMATION
+                ));
+        assertThat(solicitation.getStatus()).isEqualTo(SolicitationStatus.DRAFT);
+        assertThat(solicitation.getSubmittedAt()).isNull();
+    }
+
+    @Test
+    void doesNotMutateSolicitationWhenPreferredDateExpiredBeforeSubmission() {
+        Solicitation solicitation = new Solicitation(UUID.randomUUID());
+        solicitation.completeBasicData(validBasicData());
+        solicitation.completeAddress(validAddress());
+        solicitation.completeConfirmation(new Confirmation(
+                Priority.MEDIUM,
+                TODAY.minusDays(1),
+                null,
+                true
+        ), TODAY.minusDays(2));
+
+        assertThatThrownBy(() -> solicitation.submit(TODAY, NOW))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Preferred date cannot be in the past");
+
+        assertThat(solicitation.getStatus()).isEqualTo(SolicitationStatus.DRAFT);
+        assertThat(solicitation.getSubmittedAt()).isNull();
     }
 
     private static Solicitation submittedSolicitation() {
