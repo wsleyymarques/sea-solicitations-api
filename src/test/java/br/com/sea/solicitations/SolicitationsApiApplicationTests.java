@@ -1,5 +1,6 @@
 package br.com.sea.solicitations;
 
+import br.com.sea.solicitations.solicitation.adapter.out.persistence.SpringDataSolicitationJpaRepository;
 import br.com.sea.solicitations.user.adapter.out.persistence.SpringDataUserJpaRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,6 +22,9 @@ class SolicitationsApiApplicationTests {
 
     @MockitoBean
     private SpringDataUserJpaRepository userJpaRepository;
+
+    @MockitoBean
+    private SpringDataSolicitationJpaRepository solicitationJpaRepository;
 
     @Test
     void contextLoads() {
