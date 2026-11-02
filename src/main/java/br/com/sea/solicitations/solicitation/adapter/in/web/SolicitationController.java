@@ -4,9 +4,14 @@ import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CreateSolicitati
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CreateSolicitationResponse;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicitationAddressRequest;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicitationAddressResponse;
+import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicitationConfirmationRequest;
+import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicitationConfirmationResponse;
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationAddressCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationAddressResult;
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationAddressUseCase;
+import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationConfirmationCommand;
+import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationConfirmationResult;
+import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationConfirmationUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationResult;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationUseCase;
@@ -31,10 +36,12 @@ public class SolicitationController {
 
     private final CreateSolicitationUseCase createSolicitationUseCase;
     private final CompleteSolicitationAddressUseCase completeSolicitationAddressUseCase;
+    private final CompleteSolicitationConfirmationUseCase completeSolicitationConfirmationUseCase;
 
     public SolicitationController(
             CreateSolicitationUseCase createSolicitationUseCase,
-            CompleteSolicitationAddressUseCase completeSolicitationAddressUseCase
+            CompleteSolicitationAddressUseCase completeSolicitationAddressUseCase,
+            CompleteSolicitationConfirmationUseCase completeSolicitationConfirmationUseCase
     ) {
         this.createSolicitationUseCase = Objects.requireNonNull(
                 createSolicitationUseCase,
@@ -43,6 +50,10 @@ public class SolicitationController {
         this.completeSolicitationAddressUseCase = Objects.requireNonNull(
                 completeSolicitationAddressUseCase,
                 "Complete solicitation address use case is required"
+        );
+        this.completeSolicitationConfirmationUseCase = Objects.requireNonNull(
+                completeSolicitationConfirmationUseCase,
+                "Complete solicitation confirmation use case is required"
         );
     }
 
@@ -82,5 +93,25 @@ public class SolicitationController {
         CompleteSolicitationAddressResult result = completeSolicitationAddressUseCase.complete(command);
 
         return ResponseEntity.ok(CompleteSolicitationAddressResponse.from(result));
+    }
+
+    @PutMapping("/{id}/confirmation")
+    public ResponseEntity<CompleteSolicitationConfirmationResponse> completeConfirmation(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CompleteSolicitationConfirmationRequest request
+    ) {
+        CompleteSolicitationConfirmationCommand command = new CompleteSolicitationConfirmationCommand(
+                id,
+                UUID.fromString(jwt.getSubject()),
+                request.priority(),
+                request.preferredDate(),
+                request.estimatedValue(),
+                request.termsAccepted()
+        );
+        CompleteSolicitationConfirmationResult result =
+                completeSolicitationConfirmationUseCase.complete(command);
+
+        return ResponseEntity.ok(CompleteSolicitationConfirmationResponse.from(result));
     }
 }

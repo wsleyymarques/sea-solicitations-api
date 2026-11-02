@@ -15,7 +15,6 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import java.time.Clock;
 import java.util.Base64;
 
 @Configuration(proxyBeanMethods = false)
@@ -24,11 +23,6 @@ public class JwtConfiguration {
 
     private static final int MINIMUM_SECRET_BYTES = 32;
     private static final String HMAC_SHA_256 = "HmacSHA256";
-
-    @Bean
-    public Clock jwtClock() {
-        return Clock.systemUTC();
-    }
 
     @Bean
     public SecretKey jwtSecretKey(JwtProperties properties) {
