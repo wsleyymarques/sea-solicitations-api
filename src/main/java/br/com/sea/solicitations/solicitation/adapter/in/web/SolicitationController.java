@@ -6,6 +6,7 @@ import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicita
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicitationAddressResponse;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicitationConfirmationRequest;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.CompleteSolicitationConfirmationResponse;
+import br.com.sea.solicitations.solicitation.adapter.in.web.dto.SubmitSolicitationResponse;
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationAddressCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationAddressResult;
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationAddressUseCase;
@@ -15,6 +16,9 @@ import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicit
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationResult;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationUseCase;
+import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationCommand;
+import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationResult;
+import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationUseCase;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,11 +41,13 @@ public class SolicitationController {
     private final CreateSolicitationUseCase createSolicitationUseCase;
     private final CompleteSolicitationAddressUseCase completeSolicitationAddressUseCase;
     private final CompleteSolicitationConfirmationUseCase completeSolicitationConfirmationUseCase;
+    private final SubmitSolicitationUseCase submitSolicitationUseCase;
 
     public SolicitationController(
             CreateSolicitationUseCase createSolicitationUseCase,
             CompleteSolicitationAddressUseCase completeSolicitationAddressUseCase,
-            CompleteSolicitationConfirmationUseCase completeSolicitationConfirmationUseCase
+            CompleteSolicitationConfirmationUseCase completeSolicitationConfirmationUseCase,
+            SubmitSolicitationUseCase submitSolicitationUseCase
     ) {
         this.createSolicitationUseCase = Objects.requireNonNull(
                 createSolicitationUseCase,
@@ -54,6 +60,10 @@ public class SolicitationController {
         this.completeSolicitationConfirmationUseCase = Objects.requireNonNull(
                 completeSolicitationConfirmationUseCase,
                 "Complete solicitation confirmation use case is required"
+        );
+        this.submitSolicitationUseCase = Objects.requireNonNull(
+                submitSolicitationUseCase,
+                "Submit solicitation use case is required"
         );
     }
 
@@ -113,5 +123,19 @@ public class SolicitationController {
                 completeSolicitationConfirmationUseCase.complete(command);
 
         return ResponseEntity.ok(CompleteSolicitationConfirmationResponse.from(result));
+    }
+
+    @PostMapping("/{id}/submit")
+    public ResponseEntity<SubmitSolicitationResponse> submit(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        SubmitSolicitationCommand command = new SubmitSolicitationCommand(
+                id,
+                UUID.fromString(jwt.getSubject())
+        );
+        SubmitSolicitationResult result = submitSolicitationUseCase.submit(command);
+
+        return ResponseEntity.ok(SubmitSolicitationResponse.from(result));
     }
 }

@@ -1,5 +1,6 @@
 package br.com.sea.solicitations.solicitation.domain;
 
+import br.com.sea.solicitations.solicitation.domain.exception.IncompleteSolicitationException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -15,6 +16,8 @@ import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -108,8 +111,18 @@ public class Solicitation {
 
     public void submit(LocalDate currentDate, Instant submittedAt) {
         requireDraft();
-        if (basicData == null || address == null || confirmation == null) {
-            throw new IllegalStateException("All solicitation stages must be completed before submission");
+        List<SolicitationStep> missingSteps = new ArrayList<>(3);
+        if (basicData == null) {
+            missingSteps.add(SolicitationStep.BASIC_DATA);
+        }
+        if (address == null) {
+            missingSteps.add(SolicitationStep.ADDRESS);
+        }
+        if (confirmation == null) {
+            missingSteps.add(SolicitationStep.CONFIRMATION);
+        }
+        if (!missingSteps.isEmpty()) {
+            throw new IncompleteSolicitationException(missingSteps);
         }
         confirmation.validateFor(currentDate);
         this.submittedAt = Objects.requireNonNull(submittedAt, "Submission time is required");
