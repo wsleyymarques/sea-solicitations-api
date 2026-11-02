@@ -17,6 +17,9 @@ services:
       JWT_ISSUER: ${JWT_ISSUER:-sea-solicitations-api}
       JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-1h}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      VIACEP_BASE_URL: ${VIACEP_BASE_URL:-https://viacep.com.br}
+      VIACEP_CONNECT_TIMEOUT: ${VIACEP_CONNECT_TIMEOUT:-2s}
+      VIACEP_READ_TIMEOUT: ${VIACEP_READ_TIMEOUT:-3s}
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0 -Dfile.encoding=UTF-8
       TZ: UTC
     ports:

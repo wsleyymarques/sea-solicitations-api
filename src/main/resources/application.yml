@@ -45,3 +45,9 @@ security:
     issuer: ${JWT_ISSUER:sea-solicitations-api}
     access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:1h}
     secret: ${JWT_SECRET:}
+
+integrations:
+  viacep:
+    base-url: ${VIACEP_BASE_URL:https://viacep.com.br}
+    connect-timeout: ${VIACEP_CONNECT_TIMEOUT:2s}
+    read-timeout: ${VIACEP_READ_TIMEOUT:3s}
