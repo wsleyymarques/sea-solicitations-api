@@ -9,9 +9,11 @@ continua sendo a fonte de verdade.
 ## Contratos
 
 - `GET /analyst/solicitations/search` aceita `text`, `status`, `serviceType`,
-  `priority`, `state`, `submittedFrom`, `submittedTo`, `page` (padrao 0),
-  `size` (padrao 20, maximo 100), `sortBy` (`SUBMITTED_AT`, `CREATED_AT`,
+  `priority`, `state`, `dateFrom`, `dateTo`, `page` (padrao 0),
+  `size` (padrao 20, maximo 100), `sort` (`SUBMITTED_AT`, `CREATED_AT`,
   `PREFERRED_DATE`) e `direction` (`ASC`, `DESC`; padrao `DESC`).
+- `submittedFrom`, `submittedTo` e `sortBy` continuam aceitos como aliases de
+  compatibilidade; os parametros canonicos prevalecem quando ambos aparecem.
 - As datas sao dias UTC inclusivos do instante de submissao. `from > to` e
   paginacao alem da janela de 10.000 documentos do Elasticsearch recebem 400.
 - A resposta contem `content`, `page`, `size`, `totalElements`, `totalPages`.

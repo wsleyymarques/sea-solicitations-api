@@ -15,6 +15,8 @@ busca avancada do Marco 8.
 - Resposta: `content`, `page`, `size`, `totalElements` e `totalPages`.
 - Cada item contem `id`, `status`, `serviceType`, `title`, `priority`, `state`,
   `submittedAt`, `assignedAnalystId` e `reviewStartedAt`.
+- `GET /analyst/solicitations/{id}` devolve os dados basicos, endereco,
+  confirmacao e decisao opcional da solicitacao visivel ao analista.
 
 ## Visibilidade e autorizacao
 
@@ -29,6 +31,10 @@ Solicitacoes `DRAFT`, terminais ou em analise por outro analista nao aparecem.
 Claim de cobertura ausente ou malformada continua produzindo
 `403 SOLICITATION_REVIEW_ACCESS_DENIED`. Cobertura vazia produz uma pagina
 vazia, sem ampliar o acesso.
+
+No detalhe, uma solicitacao `SUBMITTED` e visivel dentro da cobertura. Estados
+`IN_REVIEW`, `APPROVED` e `REJECTED` exigem tambem que o analista autenticado
+seja o atribuido. Rascunhos e registros fora desse escopo respondem `403`.
 
 ## Arquitetura
 
@@ -51,7 +57,6 @@ dados fora da cobertura nunca sejam carregados para filtragem em memoria.
 ## Nao objetivos
 
 - Filtros por texto, status, tipo, prioridade, UF ou periodo.
-- Endpoint de detalhe da solicitacao.
 - Indexacao Elasticsearch, outbox, auditoria ou decisao da analise.
 
 ## Verificacao

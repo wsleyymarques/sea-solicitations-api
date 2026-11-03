@@ -142,10 +142,12 @@ async function execute(action: string, form?: HTMLFormElement): Promise<void> {
     for (const [key, value] of Object.entries(data)) if (value) params.set(key, String(value).trim())
     result = await api('/analyst/solicitations/search?' + params, 'GET', undefined, 'analyst')
     if (result.status < 400) renderResults(result.body)
+  } else if (action === 'detail') {
+    result = await api('/analyst/solicitations/' + solicitationId('#analyst-id'), 'GET', undefined, 'analyst')
   } else if (action === 'start') {
     result = await api('/analyst/solicitations/' + solicitationId('#analyst-id') + '/start', 'POST', undefined, 'analyst')
   } else if (action === 'decision') {
-    result = await api('/analyst/solicitations/' + solicitationId('#analyst-id') + '/decision', 'POST', data, 'analyst')
+    result = await api('/analyst/solicitations/' + solicitationId('#analyst-id') + '/decide', 'POST', data, 'analyst')
   } else return
   show(action, result)
 }

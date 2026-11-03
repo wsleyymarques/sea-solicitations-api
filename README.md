@@ -396,6 +396,19 @@ quando estiverem atribuidas a ele. Rascunhos, solicitacoes terminais e analises
 atribuidas a outro analista nao aparecem. `page` comeca em zero e `size` aceita
 valores de `1` a `100`.
 
+Para consultar todos os dados de uma solicitacao visivel, use o detalhe:
+
+```bash
+curl --request GET http://localhost:8080/analyst/solicitations/<solicitationId> \
+  --header 'Authorization: Bearer <analystAccessToken>'
+```
+
+O detalhe inclui dados basicos, endereco, confirmacao e, quando existente, a
+decisao. Uma solicitacao `SUBMITTED` fica disponivel aos analistas que cobrem a
+UF; depois do inicio da analise, somente o analista atribuido pode consulta-la.
+Rascunhos, UFs fora da cobertura e solicitacoes atribuidas a outro analista
+respondem `403 SOLICITATION_REVIEW_ACCESS_DENIED`.
+
 Um analista pode iniciar a analise de uma solicitacao submetida cuja UF esteja
 em sua cobertura:
 
@@ -420,7 +433,7 @@ responde `409 INVALID_SOLICITATION_STATE`; atualizacoes concorrentes respondem
 O analista que iniciou a analise pode aprovar ou rejeitar a solicitacao:
 
 ```bash
-curl --request POST http://localhost:8080/analyst/solicitations/<solicitationId>/decision \
+curl --request POST http://localhost:8080/analyst/solicitations/<solicitationId>/decide \
   --header 'Authorization: Bearer <analystAccessToken>' \
   --header 'Content-Type: application/json' \
   --data '{"outcome":"APPROVED","comment":"Parecer favoravel para atendimento."}'
@@ -440,6 +453,9 @@ responde `403 SOLICITATION_REVIEW_ACCESS_DENIED`; solicitacao inexistente,
 `404 SOLICITATION_NOT_FOUND`; corpo invalido, `400`; atualizacao concorrente,
 `409 SOLICITATION_CONCURRENT_UPDATE`.
 
+`/decide` e a rota canonica do contrato. `/decision` continua aceito como alias
+de compatibilidade para clientes antigos.
+
 ## Busca de solicitacoes no Elasticsearch
 
 O analista pode pesquisar solicitacoes da sua cobertura:
@@ -450,19 +466,24 @@ curl --get http://localhost:8080/analyst/solicitations/search \
   --data-urlencode 'text=equipamento' \
   --data-urlencode 'status=SUBMITTED' \
   --data-urlencode 'state=SP' \
-  --data-urlencode 'submittedFrom=2026-11-01' \
-  --data-urlencode 'submittedTo=2026-11-30' \
+  --data-urlencode 'dateFrom=2026-11-01' \
+  --data-urlencode 'dateTo=2026-11-30' \
+  --data-urlencode 'sort=SUBMITTED_AT' \
   --data-urlencode 'page=0' \
   --data-urlencode 'size=20'
 ```
 
 Filtros opcionais: `text` (titulo e descricao, ate 200 caracteres), `status`,
-`serviceType`, `priority`, `state`, `submittedFrom` e `submittedTo`. As datas
-delimitam dias completos de submissao em UTC. A ordenacao usa `sortBy`
+`serviceType`, `priority`, `state`, `dateFrom` e `dateTo`. As datas delimitam
+dias completos de submissao em UTC. A ordenacao usa `sort`
 (`SUBMITTED_AT`, `CREATED_AT` ou `PREFERRED_DATE`) e `direction` (`ASC` ou
 `DESC`); o padrao e `SUBMITTED_AT DESC`. `page` comeca em zero, `size` vai de
 `1` a `100`, e a janela solicitada deve caber nos primeiros 10.000 resultados.
 A resposta inclui `content`, `page`, `size`, `totalElements` e `totalPages`.
+
+`submittedFrom`, `submittedTo` e `sortBy` permanecem como aliases de
+compatibilidade. Quando o nome canonico e o alias sao enviados juntos, o valor
+canonico prevalece.
 
 A cobertura vem sempre da claim `coveredStates` do JWT. `state` apenas
 restringe o resultado. Solicitacoes `SUBMITTED` aparecem na cobertura;
@@ -520,8 +541,8 @@ LIMIT 20;
 
 ## Metricas operacionais
 
-O Actuator publica metricas Prometheus em `/actuator/prometheus`. A rota
-requer autenticacao; use um token valido para inspecao local:
+O Actuator publica metricas Prometheus em `/actuator/prometheus`. A rota e
+restrita ao perfil `ADMIN`; use um token de administrador para inspecao local:
 
 ```bash
 curl http://localhost:8080/actuator/prometheus \

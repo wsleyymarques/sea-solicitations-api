@@ -8,11 +8,14 @@ terminal, persistido e consultavel no proprio registro da solicitacao.
 
 ## Contrato HTTP
 
-`POST /analyst/solicitations/{id}/decision` recebe `outcome` (`APPROVED` ou
+`POST /analyst/solicitations/{id}/decide` recebe `outcome` (`APPROVED` ou
 `REJECTED`) e `comment` (10 a 1000 caracteres apos remover espacos externos).
 Responde `200 OK` com `id`, `status`, `analystId`, `comment` normalizado e
 `decidedAt`. O analista e obtido do `sub` do JWT; a cobertura vem de
 `coveredStates`. Nenhum dos dois pode ser escolhido no corpo.
+
+`POST /analyst/solicitations/{id}/decision` permanece disponivel como alias de
+compatibilidade; exemplos e clientes novos usam `/decide`.
 
 Corpo ausente ou invalido responde `400`. Solicitacao inexistente responde
 `404`. UF fora da cobertura ou analista diferente do atribuido responde `403`.
