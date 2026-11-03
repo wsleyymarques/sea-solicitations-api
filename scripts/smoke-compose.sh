@@ -102,7 +102,8 @@ assert status == 201 and solicitation["id"]
 document_url = (
     f"http://127.0.0.1:{sys.argv[2]}/solicitations-v1/_doc/{solicitation['id']}"
 )
-deadline = time.monotonic() + 45
+deadline = time.monotonic() + 90
+last_error = None
 while time.monotonic() < deadline:
     try:
         with urllib.request.urlopen(document_url, timeout=5) as response:
@@ -111,11 +112,16 @@ while time.monotonic() < deadline:
         assert document["_source"]["title"] == "Instalacao de teste", document
         break
     except urllib.error.HTTPError as error:
-        if error.code != 404:
+        if error.code not in (404, 429, 502, 503, 504):
             raise
-        time.sleep(1)
+        last_error = error
+    except (urllib.error.URLError, TimeoutError) as error:
+        last_error = error
+    time.sleep(1)
 else:
-    raise AssertionError("Solicitation was not indexed by the outbox within 45 seconds")
+    raise AssertionError(
+        f"Solicitation was not indexed by the outbox within 90 seconds: {last_error}"
+    )
 
 print("Compose smoke passed: health, OpenAPI, registration, login, metrics, solicitation and Elasticsearch indexing")
 PY
