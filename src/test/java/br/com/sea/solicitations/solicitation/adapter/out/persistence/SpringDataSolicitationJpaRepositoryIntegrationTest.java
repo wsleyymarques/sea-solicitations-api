@@ -5,9 +5,13 @@ import br.com.sea.solicitations.solicitation.application.exception.SolicitationC
 import br.com.sea.solicitations.solicitation.application.port.out.SolicitationPage;
 import br.com.sea.solicitations.solicitation.application.port.out.SolicitationRepository;
 import br.com.sea.solicitations.solicitation.domain.Solicitation;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -35,6 +39,9 @@ class SpringDataSolicitationJpaRepositoryIntegrationTest {
     private static final UUID CLIENT_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID ANALYST_ID = UUID.fromString("20000000-0000-0000-0000-000000000001");
     private static final UUID OTHER_ANALYST_ID = UUID.fromString("20000000-0000-0000-0000-000000000002");
+    private static final UUID STALE_CLIENT_ID = UUID.fromString("10000000-0000-0000-0000-000000000011");
+    private static final UUID STALE_ANALYST_ID = UUID.fromString("20000000-0000-0000-0000-000000000011");
+    private static final UUID WINNING_ANALYST_ID = UUID.fromString("20000000-0000-0000-0000-000000000012");
     private static final Instant NOW = Instant.parse("2026-11-02T12:00:00Z");
 
     @Autowired
@@ -44,7 +51,7 @@ class SpringDataSolicitationJpaRepositoryIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
-    private EntityManager entityManager;
+    private PlatformTransactionManager transactionManager;
 
     @Test
     void filtersByCoverageStatusAndAssignmentWithStablePagination() {
@@ -111,23 +118,32 @@ class SpringDataSolicitationJpaRepositoryIntegrationTest {
     }
 
     @Test
-    void translatesARealPostgresStaleVersionWriteToTheApplicationConflict() {
-        insertUser(CLIENT_ID, "stale-client@example.com", "CLIENT");
-        insertUser(ANALYST_ID, "stale-analyst@example.com", "ANALYST");
-        insertUser(OTHER_ANALYST_ID, "stale-other-analyst@example.com", "ANALYST");
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void translatesAFlushConflictFromIndependentPostgresTransactions() {
+        insertUser(STALE_CLIENT_ID, "stale-client@example.com", "CLIENT");
+        insertUser(STALE_ANALYST_ID, "stale-analyst@example.com", "ANALYST");
+        insertUser(WINNING_ANALYST_ID, "winning-analyst@example.com", "ANALYST");
         UUID solicitationId = UUID.fromString("30000000-0000-0000-0000-000000000010");
-        insertSolicitation(solicitationId, "SP", "SUBMITTED", null, NOW, null);
+        insertSolicitation(
+                solicitationId, STALE_CLIENT_ID, "SP", "SUBMITTED", null, NOW, null
+        );
 
-        Solicitation firstWriter = repository.findById(solicitationId).orElseThrow();
-        entityManager.detach(firstWriter);
-        Solicitation staleWriter = repository.findById(solicitationId).orElseThrow();
-        entityManager.detach(staleWriter);
+        TransactionTemplate losingTransaction = new TransactionTemplate(transactionManager);
+        TransactionTemplate winningTransaction = new TransactionTemplate(transactionManager);
+        winningTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
-        firstWriter.startReview(ANALYST_ID, NOW.plusSeconds(1));
-        repository.save(firstWriter);
+        assertThatThrownBy(() -> losingTransaction.executeWithoutResult(status -> {
+            Solicitation staleWriter = repository.findById(solicitationId).orElseThrow();
 
-        staleWriter.startReview(OTHER_ANALYST_ID, NOW.plusSeconds(2));
-        assertThatThrownBy(() -> repository.save(staleWriter))
+            winningTransaction.executeWithoutResult(ignored -> {
+                Solicitation winningWriter = repository.findById(solicitationId).orElseThrow();
+                winningWriter.startReview(WINNING_ANALYST_ID, NOW.plusSeconds(1));
+                repository.save(winningWriter);
+            });
+
+            staleWriter.startReview(STALE_ANALYST_ID, NOW.plusSeconds(2));
+            repository.save(staleWriter);
+        }))
                 .isInstanceOf(SolicitationConcurrentUpdateException.class)
                 .hasMessage("Solicitation was updated by another request");
     }
@@ -157,6 +173,20 @@ class SpringDataSolicitationJpaRepositoryIntegrationTest {
             Instant submittedAt,
             Instant reviewStartedAt
     ) {
+        insertSolicitation(
+                id, CLIENT_ID, state, status, assignedAnalystId, submittedAt, reviewStartedAt
+        );
+    }
+
+    private void insertSolicitation(
+            UUID id,
+            UUID clientId,
+            String state,
+            String status,
+            UUID assignedAnalystId,
+            Instant submittedAt,
+            Instant reviewStartedAt
+    ) {
         jdbcTemplate.update("""
                 INSERT INTO solicitations (
                     id, client_id, service_type, title, description,
@@ -175,7 +205,7 @@ class SpringDataSolicitationJpaRepositoryIntegrationTest {
                 )
                 """,
                 id,
-                CLIENT_ID,
+                clientId,
                 "Solicitation " + id,
                 "Descricao completa para o teste de integracao da consulta.",
                 state,
