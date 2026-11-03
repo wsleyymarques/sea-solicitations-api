@@ -51,7 +51,18 @@ export JWT_SECRET
 
 compose up --build --wait --wait-timeout 240
 
-python3 - "$APP_PORT" "$ELASTICSEARCH_PORT" <<'PY'
+smoke_admin_email="smoke-admin@example.com"
+smoke_admin_password="StrongPassword@123"
+smoke_admin_hash='$2y$12$dkJFoZrcdFg5JYwVpDninOZ.nictzKKQOObnm5HfiRpJYnRxsqFLC'
+{
+  printf '\\set admin_email %s\n' "$smoke_admin_email"
+  printf '\\set admin_hash %s\n' "$smoke_admin_hash"
+  cat "$repo_dir/scripts/bootstrap-admin.sql"
+} | compose exec --no-TTY postgres sh -c \
+  'psql -X --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --set ON_ERROR_STOP=1' \
+  >/dev/null
+
+python3 - "$APP_PORT" "$ELASTICSEARCH_PORT" "$smoke_admin_email" "$smoke_admin_password" <<'PY'
 import json
 import sys
 import time
@@ -85,10 +96,24 @@ status, logged_in = request("/auth/login", {
     "email": email, "password": password
 })
 assert status == 200 and logged_in["accessToken"]
-metrics_call = urllib.request.Request(base + "/actuator/prometheus", headers={
+client_metrics_call = urllib.request.Request(base + "/actuator/prometheus", headers={
     "Authorization": f"Bearer {logged_in['accessToken']}"
 })
-with urllib.request.urlopen(metrics_call, timeout=20) as response:
+try:
+    urllib.request.urlopen(client_metrics_call, timeout=20)
+except urllib.error.HTTPError as error:
+    assert error.code == 403, error
+else:
+    raise AssertionError("CLIENT unexpectedly accessed Prometheus metrics")
+
+status, admin_logged_in = request("/auth/login", {
+    "email": sys.argv[3], "password": sys.argv[4]
+})
+assert status == 200 and admin_logged_in["accessToken"]
+admin_metrics_call = urllib.request.Request(base + "/actuator/prometheus", headers={
+    "Authorization": f"Bearer {admin_logged_in['accessToken']}"
+})
+with urllib.request.urlopen(admin_metrics_call, timeout=20) as response:
     metrics = response.read().decode()
 assert "sea_outbox_pending" in metrics
 assert "sea_audit_write_failures_total" in metrics
@@ -123,5 +148,5 @@ else:
         f"Solicitation was not indexed by the outbox within 90 seconds: {last_error}"
     )
 
-print("Compose smoke passed: health, OpenAPI, registration, login, metrics, solicitation and Elasticsearch indexing")
+print("Compose smoke passed: health, OpenAPI, registration, role-protected metrics, solicitation and Elasticsearch indexing")
 PY

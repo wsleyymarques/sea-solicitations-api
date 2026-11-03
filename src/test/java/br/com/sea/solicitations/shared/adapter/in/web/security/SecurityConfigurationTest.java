@@ -60,6 +60,27 @@ class SecurityConfigurationTest {
     }
 
     @Test
+    void allowsPrometheusMetricsOnlyToAdministrators() throws Exception {
+        mockMvc.perform(get("/actuator/prometheus"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        mockMvc.perform(get("/actuator/prometheus")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        mockMvc.perform(get("/actuator/prometheus")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ANALYST"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+
+        mockMvc.perform(get("/actuator/prometheus")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void returnsStandardizedUnauthorizedResponseForProtectedEndpoint() throws Exception {
         mockMvc.perform(get("/protected"))
                 .andExpect(status().isUnauthorized())
@@ -175,6 +196,7 @@ class SecurityConfigurationTest {
         @GetMapping({
                 "/actuator/health",
                 "/actuator/health/liveness",
+                "/actuator/prometheus",
                 "/v3/api-docs",
                 "/swagger-ui/index.html",
                 "/swagger-ui.html"
