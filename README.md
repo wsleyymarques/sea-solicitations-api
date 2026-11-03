@@ -185,6 +185,24 @@ Os servicos ficarao disponiveis em:
 
 ## Testando pela tela e pelo Postman
 
+Para carregar contas prontas para teste, primeiro inicie o PostgreSQL:
+
+```bash
+docker compose up --detach postgres
+ALLOW_TEST_SEED=1 bash scripts/seed-test-users.sh
+```
+
+A seed e idempotente: cria as contas que ainda nao existem e atribui cobertura
+SP/RJ ao analista de teste. Ela exige `ALLOW_TEST_SEED=1` porque todas as contas
+compartilham a senha de demonstracao `StrongPassword@123`; execute somente em
+banco local de teste. As credenciais sao:
+
+| Perfil | E-mail |
+| --- | --- |
+| CLIENT | `cliente.teste@example.com` |
+| ANALYST | `analista.teste@example.com` |
+| ADMIN | `admin.teste@example.com` |
+
 Com a API ativa na porta `8080`, inicie o frontend local (Node.js 22):
 
 ```bash
@@ -198,7 +216,9 @@ sem alterar o CORS do backend. Para outra porta da API, defina
 `VITE_API_TARGET=http://localhost:PORTA` antes de `npm run dev`.
 O painel cobre cadastro e login do cliente, criacao e envio da solicitacao,
 login e cadastro de analista pelo administrador, lista, busca, inicio da
-analise e decisao. Os tokens ficam apenas na memoria da aba e sao descartados
+analise e decisao. Para entrar com as contas seed, use o e-mail e a senha
+`StrongPassword@123` no formulario do perfil correspondente. Os tokens ficam
+apenas na memoria da aba e sao descartados
 ao recarregar a pagina. O ID da solicitacao e preenchido automaticamente ao
 criar; tambem pode ser colado manualmente.
 
