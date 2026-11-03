@@ -33,11 +33,17 @@ br.com.sea.solicitations
 |       |-- out/
 |       `-- config/
 |-- solicitation/
-|   `-- domain/
+|   |-- domain/
+|   |-- application/
+|   `-- adapter/
 |-- audit/
-|   `-- domain/
+|   |-- domain/
+|   |-- application/
+|   `-- adapter/
 |-- outbox/
-|   `-- domain/
+|   |-- domain/
+|   |-- application/
+|   `-- adapter/
 `-- shared/
     |-- domain/
     `-- adapter/
@@ -45,8 +51,8 @@ br.com.sea.solicitations
 
 Os modulos `user` e `solicitation` possuem fluxos verticais completos. Em
 `solicitation`, os casos de uso dependem de portas proprias e nao conhecem JPA,
-HTTP nem ViaCEP; os adapters implementam essas fronteiras. Os modulos `audit` e
-`outbox` ainda possuem principalmente suas fundacoes de dominio. Cada modulo
+HTTP nem ViaCEP; os adapters implementam essas fronteiras. `outbox` processa
+pedidos duraveis de indexacao. `audit` registra operacoes de escrita por AOP. Cada modulo
 recebe pacotes `application` e `adapter` somente quando existem casos de uso,
 portas ou adapters reais, evitando abstracoes e pastas vazias criadas apenas
 por convencao.
@@ -61,6 +67,36 @@ marcos funcionais sem datas fixas, conforme o
 ./mvnw test
 ```
 
+A consulta JPA do analista possui uma verificacao adicional contra PostgreSQL
+real. O cadastro de usuarios internos tambem verifica usuario, hash BCrypt e
+cobertura por UF no banco. Os comandos criam e removem containers descartaveis
+e exigem Docker em execucao:
+
+```bash
+bash scripts/test-analyst-solicitation-query.sh
+bash scripts/test-internal-user-persistence.sh
+bash scripts/test-outbox-persistence.sh
+bash scripts/test-audit-persistence.sh
+```
+
+Os testes HTTP com Testcontainers rodam em um perfil separado. Eles conferem
+cadastro, login, autorizacao, criacao, endereco com consulta de CEP simulada,
+confirmacao, submissao, listagem, aprovacao, rejeicao, Flyway, outbox e
+auditoria no PostgreSQL real:
+
+```bash
+./mvnw -Pintegration verify
+```
+
+Esse comando exige Docker. `./mvnw verify` continua executavel sem Docker.
+Para verificar tambem a inicializacao da aplicacao, PostgreSQL e Elasticsearch
+pelo Compose e aguardar a indexacao real via outbox, com recursos temporarios
+isolados:
+
+```bash
+bash scripts/smoke-compose.sh
+```
+
 ## Integracao continua
 
 O workflow [CI](.github/workflows/ci.yml) e executado em todo `push` e
@@ -68,10 +104,13 @@ O workflow [CI](.github/workflows/ci.yml) e executado em todo `push` e
 executa, nesta ordem:
 
 1. `./mvnw --batch-mode --no-transfer-progress verify`;
-2. `docker compose --env-file .env.example config --quiet`;
-3. `docker build --tag sea-solicitations-api:ci .`.
+2. `npm ci && npm run build` em `frontend/`;
+3. `docker compose --env-file .env.example config --quiet`;
+4. `docker build --tag sea-solicitations-api:ci .`;
+5. `./mvnw --batch-mode --no-transfer-progress -Pintegration verify`;
+6. `bash scripts/smoke-compose.sh`.
 
-Quando a pipeline falha, ela tenta disponibilizar os relatorios Surefire como
+Quando a pipeline falha, ela tenta disponibilizar os relatorios Surefire e Failsafe como
 artifact por sete dias, sem transformar a ausencia de relatorios em uma nova
 falha. As actions oficiais sao fixadas por SHA e o `GITHUB_TOKEN` possui apenas
 permissao de leitura do conteudo do repositorio.
@@ -141,6 +180,41 @@ Os servicos ficarao disponiveis em:
 - Healthcheck da API: `http://localhost:8080/actuator/health`
 - PostgreSQL: `localhost:5432`
 - Elasticsearch: `http://localhost:9200`
+- OpenAPI: `http://localhost:8080/v3/api-docs`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+
+## Testando pela tela e pelo Postman
+
+Com a API ativa na porta `8080`, inicie o frontend local (Node.js 22):
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+Abra `http://localhost:5173`. A tela usa o proxy do Vite para chamar a API,
+sem alterar o CORS do backend. Para outra porta da API, defina
+`VITE_API_TARGET=http://localhost:PORTA` antes de `npm run dev`.
+O painel cobre cadastro e login do cliente, criacao e envio da solicitacao,
+login e cadastro de analista pelo administrador, lista, busca, inicio da
+analise e decisao. Os tokens ficam apenas na memoria da aba e sao descartados
+ao recarregar a pagina. O ID da solicitacao e preenchido automaticamente ao
+criar; tambem pode ser colado manualmente.
+
+Para testar no Postman, importe
+[`postman/sea-solicitacoes.postman_collection.json`](postman/sea-solicitacoes.postman_collection.json)
+e [`postman/sea-local.postman_environment.json`](postman/sea-local.postman_environment.json).
+Selecione o ambiente local e preencha `adminEmail` e `adminPassword` com as
+credenciais do primeiro administrador. Crie essa conta pelo
+`scripts/bootstrap-admin.sh` se ainda nao existir. Execute a colecao na
+ordem numerada. Ela gera e-mails de teste exclusivos, captura tokens e ID da
+solicitacao automaticamente e verifica os codigos e estados principais,
+incluindo aprovacao e rejeicao em pedidos diferentes.
+A busca usa indexacao assincrona; execute novamente a requisicao 11 se o
+registro ainda nao aparecer. O arquivo de ambiente nao contem senha real.
+Para regenerar os arquivos Postman apos alterar os contratos, execute
+`python3 scripts/generate-postman.py`.
 
 ## Autenticacao JWT
 
@@ -176,6 +250,55 @@ Authorization: Bearer <accessToken>
 
 O JWT e assinado com HS256 e contem o ID do usuario em `sub`, alem das claims
 `role` e `coveredStates`. A aplicacao nao cria sessao no servidor.
+
+### Primeiro administrador local
+
+Depois de configurar `.env`, inicie o PostgreSQL e execute a seed local uma
+unica vez, informando o e-mail desejado:
+
+```bash
+docker compose up --detach postgres
+scripts/bootstrap-admin.sh admin@example.com
+```
+
+O script pede a senha duas vezes, gera um hash BCrypt com custo 12 usando
+`htpasswd` e insere o primeiro usuario `ADMIN`. Nenhuma senha ou hash fixo fica
+no repositorio. Se ja existir um administrador, a seed nao altera sua conta ou
+senha. Se o e-mail pertencer a um cliente ou analista, a insercao falha.
+
+O comando requer `docker` e `htpasswd` no computador local. Depois, use
+`POST /auth/login` com esse e-mail e senha para obter um token de administrador.
+O teste da seed pode ser executado sem tocar no banco do projeto com
+`bash scripts/test-bootstrap-admin.sh`; ele cria e remove um PostgreSQL
+descartavel no Docker.
+
+### Cadastro de usuarios internos
+
+Com um token de `ADMIN`, crie um analista e defina ao menos uma UF de
+cobertura:
+
+```bash
+curl --request POST http://localhost:8080/admin/users \
+  --header 'Authorization: Bearer <adminAccessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "Ana Silva",
+    "email": "ana@example.com",
+    "password": "StrongPassword@123",
+    "role": "ANALYST",
+    "coveredStates": ["SP", "RJ"]
+  }'
+```
+
+A mesma rota cria outro administrador usando `"role": "ADMIN"` e omitindo
+`coveredStates` ou enviando uma lista vazia. O papel `CLIENT` nao e aceito:
+clientes continuam sendo cadastrados somente por `POST /auth/register`.
+Analista sem cobertura e administrador com cobertura retornam `400`; e-mail
+ja utilizado retorna `409`; tokens sem papel `ADMIN` recebem `403`.
+
+A resposta `201 Created` contem `id`, `name`, `email`, `role` e
+`coveredStates`. A senha e seu hash nunca sao devolvidos. O primeiro
+administrador continua sendo criado pelo bootstrap local descrito acima.
 
 ## Solicitacoes
 
@@ -257,6 +380,161 @@ Uma solicitacao incompleta responde `409 INCOMPLETE_SOLICITATION` e informa em
 preferida expirou responde `409 INVALID_SOLICITATION_STATE`. Atualizacoes
 concorrentes tambem respondem `409`, sem sobrescrever a versao persistida.
 
+## Inicio da analise
+
+Liste as solicitacoes visiveis ao analista antes de iniciar uma analise:
+
+```bash
+curl --request GET 'http://localhost:8080/analyst/solicitations?page=0&size=20' \
+  --header 'Authorization: Bearer <analystAccessToken>'
+```
+
+A resposta contem `content`, `page`, `size`, `totalElements` e `totalPages`,
+ordenados por submissao mais recente. A consulta mostra solicitacoes
+`SUBMITTED` nas UFs cobertas pelo analista e solicitacoes `IN_REVIEW` somente
+quando estiverem atribuidas a ele. Rascunhos, solicitacoes terminais e analises
+atribuidas a outro analista nao aparecem. `page` comeca em zero e `size` aceita
+valores de `1` a `100`.
+
+Um analista pode iniciar a analise de uma solicitacao submetida cuja UF esteja
+em sua cobertura:
+
+```bash
+curl --request POST http://localhost:8080/analyst/solicitations/<solicitationId>/start \
+  --header 'Authorization: Bearer <analystAccessToken>'
+```
+
+O endpoint nao recebe corpo. Responde `200 OK` com `id`, `status` igual a
+`IN_REVIEW`, `assignedAnalystId` e `reviewStartedAt`. A cobertura vem da claim
+`coveredStates` do JWT, emitida no login. Mudancas de cobertura passam a valer
+quando o analista recebe um novo token; o prazo padrao do token e de uma hora.
+
+Uma UF fora da cobertura ou uma claim ausente/invalida responde
+`403 SOLICITATION_REVIEW_ACCESS_DENIED`. Uma solicitacao inexistente responde
+`404 SOLICITATION_NOT_FOUND`. Uma solicitacao que nao esteja em `SUBMITTED`
+responde `409 INVALID_SOLICITATION_STATE`; atualizacoes concorrentes respondem
+`409 SOLICITATION_CONCURRENT_UPDATE`.
+
+## Decisao da analise
+
+O analista que iniciou a analise pode aprovar ou rejeitar a solicitacao:
+
+```bash
+curl --request POST http://localhost:8080/analyst/solicitations/<solicitationId>/decision \
+  --header 'Authorization: Bearer <analystAccessToken>' \
+  --header 'Content-Type: application/json' \
+  --data '{"outcome":"APPROVED","comment":"Parecer favoravel para atendimento."}'
+```
+
+Para rejeitar, envie `"outcome":"REJECTED"`. O comentario e obrigatorio e deve
+ter de 10 a 1000 caracteres depois de remover espacos nas extremidades. A
+resposta `200 OK` contem `id`, `status`, `analystId`, `comment` normalizado e
+`decidedAt`. Esses dados ficam persistidos com a solicitacao, permitindo
+identificar quem decidiu, o parecer e quando ocorreu. A auditoria por AOP
+registra tambem ator, resultado e request id da operacao.
+
+Somente o analista atribuido, com cobertura da UF da solicitacao, pode decidir
+enquanto ela esta em `IN_REVIEW`. A decisao e terminal: uma segunda tentativa
+responde `409 INVALID_SOLICITATION_STATE`. Falta de cobertura ou atribuicao
+responde `403 SOLICITATION_REVIEW_ACCESS_DENIED`; solicitacao inexistente,
+`404 SOLICITATION_NOT_FOUND`; corpo invalido, `400`; atualizacao concorrente,
+`409 SOLICITATION_CONCURRENT_UPDATE`.
+
+## Busca de solicitacoes no Elasticsearch
+
+O analista pode pesquisar solicitacoes da sua cobertura:
+
+```bash
+curl --get http://localhost:8080/analyst/solicitations/search \
+  --header 'Authorization: Bearer <analystAccessToken>' \
+  --data-urlencode 'text=equipamento' \
+  --data-urlencode 'status=SUBMITTED' \
+  --data-urlencode 'state=SP' \
+  --data-urlencode 'submittedFrom=2026-11-01' \
+  --data-urlencode 'submittedTo=2026-11-30' \
+  --data-urlencode 'page=0' \
+  --data-urlencode 'size=20'
+```
+
+Filtros opcionais: `text` (titulo e descricao, ate 200 caracteres), `status`,
+`serviceType`, `priority`, `state`, `submittedFrom` e `submittedTo`. As datas
+delimitam dias completos de submissao em UTC. A ordenacao usa `sortBy`
+(`SUBMITTED_AT`, `CREATED_AT` ou `PREFERRED_DATE`) e `direction` (`ASC` ou
+`DESC`); o padrao e `SUBMITTED_AT DESC`. `page` comeca em zero, `size` vai de
+`1` a `100`, e a janela solicitada deve caber nos primeiros 10.000 resultados.
+A resposta inclui `content`, `page`, `size`, `totalElements` e `totalPages`.
+
+A cobertura vem sempre da claim `coveredStates` do JWT. `state` apenas
+restringe o resultado. Solicitacoes `SUBMITTED` aparecem na cobertura;
+`IN_REVIEW`, `APPROVED` e `REJECTED` aparecem somente ao analista atribuido.
+Rascunhos nao aparecem. Cada resultado e conferido no PostgreSQL antes de ser
+devolvido, evitando que um documento antigo exponha uma solicitacao cuja
+atribuicao mudou. Se houver documentos atrasados, uma pagina pode ter menos
+itens que `size`, e `totalElements` ainda reflete a contagem do indice.
+
+O indice `solicitations-v1` e criado com mapping na primeira operacao.
+Criacao, edicao, submissao, inicio de analise e decisao gravam a solicitacao e
+um evento de outbox na mesma transacao PostgreSQL. Um worker indexa o estado
+atual em lotes de ate 20, a cada 5 segundos por padrao. A busca e eventualmente
+consistente: escritas confirmadas podem demorar a aparecer no indice. Falhas do
+Elasticsearch nao impedem a escrita; eventos pendentes sao repetidos com espera
+exponencial de 5 segundos a 5 minutos. A API de busca responde
+`503 SEARCH_UNAVAILABLE` se o Elasticsearch estiver indisponivel.
+
+O poller pode ser desativado com `OUTBOX_POLLING_ENABLED=false`. O intervalo
+e o atraso inicial aceitam `OUTBOX_POLL_INTERVAL_MS` e
+`OUTBOX_INITIAL_DELAY_MS` (ambos 5000 por padrao). Para acompanhar pendencias:
+
+```sql
+SELECT count(*) AS pending, min(occurred_at) AS oldest_pending
+FROM outbox_events WHERE processed_at IS NULL;
+```
+
+Solicitacoes anteriores a indexacao do Marco 8 precisam de reindexacao
+especifica para aparecer na busca.
+
+## Auditoria das operacoes
+
+Os casos de uso de cadastro e de escrita de solicitacoes gravam registros em
+`audit_logs`. Cada registro contem ator, acao, tipo e ID do recurso, resultado
+(`SUCCESS` ou `FAILURE`), request id, metadados permitidos e instante. A
+criacao de solicitacao gera tambem `BASIC_DATA_SAVED`; a criacao de analista
+gera `ANALYST_STATES_ASSIGNED`. A decisao distingue aprovacao e rejeicao.
+
+Envie `X-Request-Id` para correlacionar uma operacao com seu log. Se o header
+estiver ausente ou invalido, a aplicacao gera um UUID. Os metadados nao incluem
+senha, token, comentario, endereco nem corpo completo da requisicao. Falhas de
+negocio sao gravadas em uma transacao propria, mesmo quando a transacao de
+negocio reverte. Uma falha isolada de gravacao da auditoria aparece no log da
+aplicacao e nao muda a resposta de negocio.
+
+Para inspecionar os registros mais recentes no PostgreSQL:
+
+```sql
+SELECT occurred_at, actor_id, action, resource_type, resource_id,
+       outcome, request_id, metadata
+FROM audit_logs
+ORDER BY occurred_at DESC
+LIMIT 20;
+```
+
+## Metricas operacionais
+
+O Actuator publica metricas Prometheus em `/actuator/prometheus`. A rota
+requer autenticacao; use um token valido para inspecao local:
+
+```bash
+curl http://localhost:8080/actuator/prometheus \
+  --header 'Authorization: Bearer <accessToken>'
+```
+
+As metricas especificas sao `sea_outbox_pending` (eventos ainda nao
+processados), `sea_outbox_processed_total` (eventos processados),
+`sea_outbox_retries_total` (retries agendados) e
+`sea_audit_write_failures_total` (falhas de gravacao da auditoria).
+Nenhuma usa ID de usuario, email ou solicitacao como tag. Para monitoramento
+externo, configure o acesso autenticado ao endpoint de forma deliberada.
+
 Para acompanhar os logs:
 
 ```bash
@@ -275,10 +553,11 @@ O comando `docker compose down --volumes` tambem remove todos os dados locais do
 
 O Flyway executa automaticamente as migrations de `src/main/resources/db/migration` antes de o Hibernate validar o schema.
 
-A migration inicial e:
+As migrations atuais sao:
 
 ```text
 V1__create_initial_schema.sql
+V2__outbox_retry_schedule.sql
 ```
 
-Depois que uma migration for aplicada, ela nao deve ser editada. Mudancas futuras no banco devem ser adicionadas como `V2`, `V3` e assim por diante.
+Depois que uma migration for aplicada, ela nao deve ser editada. Mudancas futuras no banco devem ser adicionadas como `V3`, `V4` e assim por diante.

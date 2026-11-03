@@ -19,6 +19,14 @@ import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitat
 import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationResult;
 import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationUseCase;
+import br.com.sea.solicitations.shared.adapter.in.web.error.ApiErrorResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,6 +44,16 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/solicitations")
+@Tag(name = "Solicitacoes do cliente")
+@SecurityRequirement(name = "bearerAuth")
+@ApiResponses({
+        @ApiResponse(responseCode = "401", description = "Token ausente ou invalido",
+                content = @Content(mediaType = "application/json",
+                        schema = @Schema(implementation = ApiErrorResponse.class))),
+        @ApiResponse(responseCode = "403", description = "Papel ou acesso insuficiente",
+                content = @Content(mediaType = "application/json",
+                        schema = @Schema(implementation = ApiErrorResponse.class)))
+})
 public class SolicitationController {
 
     private final CreateSolicitationUseCase createSolicitationUseCase;
@@ -68,6 +86,10 @@ public class SolicitationController {
     }
 
     @PostMapping
+    @Operation(summary = "Criar solicitacao com dados basicos")
+    @ApiResponse(responseCode = "400", description = "Dados invalidos",
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = ApiErrorResponse.class)))
     public ResponseEntity<CreateSolicitationResponse> create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateSolicitationRequest request
@@ -88,6 +110,12 @@ public class SolicitationController {
     }
 
     @PutMapping("/{id}/address")
+    @Operation(summary = "Completar endereco de solicitacao")
+    @ApiResponse(responseCode = "400", description = "Endereco invalido",
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Solicitacao ou CEP nao encontrado")
+    @ApiResponse(responseCode = "409", description = "Estado invalido ou atualizacao concorrente")
     public ResponseEntity<CompleteSolicitationAddressResponse> completeAddress(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
@@ -106,6 +134,12 @@ public class SolicitationController {
     }
 
     @PutMapping("/{id}/confirmation")
+    @Operation(summary = "Completar confirmacao de solicitacao")
+    @ApiResponse(responseCode = "400", description = "Confirmacao invalida",
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Solicitacao nao encontrada")
+    @ApiResponse(responseCode = "409", description = "Estado invalido ou atualizacao concorrente")
     public ResponseEntity<CompleteSolicitationConfirmationResponse> completeConfirmation(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
@@ -126,6 +160,12 @@ public class SolicitationController {
     }
 
     @PostMapping("/{id}/submit")
+    @Operation(summary = "Submeter solicitacao")
+    @ApiResponse(responseCode = "400", description = "Solicitacao incompleta",
+            content = @Content(mediaType = "application/json",
+                    schema = @Schema(implementation = ApiErrorResponse.class)))
+    @ApiResponse(responseCode = "404", description = "Solicitacao nao encontrada")
+    @ApiResponse(responseCode = "409", description = "Estado invalido ou atualizacao concorrente")
     public ResponseEntity<SubmitSolicitationResponse> submit(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt

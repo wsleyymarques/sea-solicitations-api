@@ -1,5 +1,7 @@
 package br.com.sea.solicitations.solicitation.application.service;
 
+import br.com.sea.solicitations.audit.application.annotation.Audited;
+import br.com.sea.solicitations.audit.domain.AuditAction;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationResult;
 import br.com.sea.solicitations.solicitation.application.port.in.CreateSolicitationUseCase;
@@ -23,6 +25,7 @@ public class CreateSolicitationService implements CreateSolicitationUseCase {
     }
 
     @Override
+    @Audited(AuditAction.SOLICITATION_CREATED)
     @Transactional
     public CreateSolicitationResult create(CreateSolicitationCommand command) {
         Objects.requireNonNull(command, "Create solicitation command is required");

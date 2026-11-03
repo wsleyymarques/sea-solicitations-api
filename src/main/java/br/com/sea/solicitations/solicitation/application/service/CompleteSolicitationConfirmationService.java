@@ -1,5 +1,7 @@
 package br.com.sea.solicitations.solicitation.application.service;
 
+import br.com.sea.solicitations.audit.application.annotation.Audited;
+import br.com.sea.solicitations.audit.domain.AuditAction;
 import br.com.sea.solicitations.solicitation.application.exception.InvalidSolicitationStateException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationAccessDeniedException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationNotFoundException;
@@ -33,6 +35,7 @@ public class CompleteSolicitationConfirmationService implements CompleteSolicita
     }
 
     @Override
+    @Audited(AuditAction.CONFIRMATION_SAVED)
     public CompleteSolicitationConfirmationResult complete(
             CompleteSolicitationConfirmationCommand command
     ) {

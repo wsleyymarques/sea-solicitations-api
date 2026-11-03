@@ -1,11 +1,13 @@
 package br.com.sea.solicitations.shared.adapter.in.web.error;
 
 import br.com.sea.solicitations.solicitation.application.exception.InvalidSolicitationStateException;
+import br.com.sea.solicitations.solicitation.application.exception.SearchUnavailableException;
 import br.com.sea.solicitations.solicitation.application.exception.PostalCodeNotFoundException;
 import br.com.sea.solicitations.solicitation.application.exception.PostalCodeServiceUnavailableException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationAccessDeniedException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationConcurrentUpdateException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationNotFoundException;
+import br.com.sea.solicitations.solicitation.application.exception.SolicitationReviewAccessDeniedException;
 import br.com.sea.solicitations.solicitation.domain.SolicitationStep;
 import br.com.sea.solicitations.solicitation.domain.exception.IncompleteSolicitationException;
 import br.com.sea.solicitations.user.application.exception.EmailAlreadyRegisteredException;
@@ -157,6 +159,20 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(SolicitationReviewAccessDeniedException.class)
+    public ResponseEntity<ApiErrorResponse> handleSolicitationReviewAccessDenied(
+            SolicitationReviewAccessDeniedException exception,
+            HttpServletRequest request
+    ) {
+        return response(
+                HttpStatus.FORBIDDEN,
+                "SOLICITATION_REVIEW_ACCESS_DENIED",
+                exception.getMessage(),
+                request,
+                List.of()
+        );
+    }
+
     @ExceptionHandler(SolicitationNotFoundException.class)
     public ResponseEntity<ApiErrorResponse> handleSolicitationNotFound(
             SolicitationNotFoundException exception,
@@ -243,6 +259,20 @@ public class GlobalExceptionHandler {
         return response(
                 HttpStatus.SERVICE_UNAVAILABLE,
                 "POSTAL_CODE_SERVICE_UNAVAILABLE",
+                exception.getMessage(),
+                request,
+                List.of()
+        );
+    }
+
+    @ExceptionHandler(SearchUnavailableException.class)
+    public ResponseEntity<ApiErrorResponse> handleSearchUnavailable(
+            SearchUnavailableException exception,
+            HttpServletRequest request
+    ) {
+        return response(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "SEARCH_UNAVAILABLE",
                 exception.getMessage(),
                 request,
                 List.of()
