@@ -1,5 +1,7 @@
 package br.com.sea.solicitations.solicitation.application.service;
 
+import br.com.sea.solicitations.audit.application.annotation.Audited;
+import br.com.sea.solicitations.audit.domain.AuditAction;
 import br.com.sea.solicitations.solicitation.application.exception.InvalidSolicitationStateException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationAccessDeniedException;
 import br.com.sea.solicitations.solicitation.application.exception.SolicitationNotFoundException;
@@ -33,6 +35,7 @@ public class SubmitSolicitationService implements SubmitSolicitationUseCase {
     }
 
     @Override
+    @Audited(AuditAction.SOLICITATION_SUBMITTED)
     public SubmitSolicitationResult submit(SubmitSolicitationCommand command) {
         Objects.requireNonNull(command, "Submit solicitation command is required");
 

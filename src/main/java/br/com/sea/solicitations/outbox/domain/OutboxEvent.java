@@ -44,6 +44,9 @@ public class OutboxEvent {
     @Column(name = "processed_at")
     private Instant processedAt;
 
+    @Column(name = "next_attempt_at", nullable = false)
+    private Instant nextAttemptAt;
+
     @Column(nullable = false)
     private int attempts;
 
@@ -66,6 +69,7 @@ public class OutboxEvent {
         this.eventType = Objects.requireNonNull(eventType, "Event type is required");
         this.payload = new HashMap<>(Objects.requireNonNull(payload, "Event payload is required"));
         this.occurredAt = Objects.requireNonNull(occurredAt, "Event time is required");
+        this.nextAttemptAt = occurredAt;
     }
 
     public void markProcessed(Instant processedAt) {
@@ -76,12 +80,15 @@ public class OutboxEvent {
         this.lastError = null;
     }
 
-    public void registerFailure(String errorMessage) {
+    public void registerFailure(String errorMessage, Instant attemptedAt) {
         if (processedAt != null) {
             throw new IllegalStateException("A processed outbox event cannot fail");
         }
+        Instant failureTime = Objects.requireNonNull(attemptedAt, "Attempt time is required");
         attempts++;
         lastError = truncateError(errorMessage);
+        long delaySeconds = Math.min(300L, 5L << Math.min(attempts - 1, 6));
+        nextAttemptAt = failureTime.plusSeconds(delaySeconds);
     }
 
     public boolean isProcessed() {
@@ -118,6 +125,10 @@ public class OutboxEvent {
 
     public Instant getProcessedAt() {
         return processedAt;
+    }
+
+    public Instant getNextAttemptAt() {
+        return nextAttemptAt;
     }
 
     public int getAttempts() {

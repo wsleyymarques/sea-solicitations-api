@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sea Solicitações · Testes</title>
+  </head>
+  <body>
+    <header class="top"><div class="brand"><span>S</span>Sea Solicitações</div><div id="health" class="health">Verificando API…</div></header>
+    <main>
+      <div class="intro"><div><h1>Teste o fluxo completo pela tela.</h1><p>Cadastre um cliente, crie e envie uma solicitação. Entre como analista para iniciar a análise e registrar a decisão.</p></div><div class="links"><a href="/swagger-ui.html" target="_blank" rel="noreferrer">Swagger ↗</a><a href="/v3/api-docs" target="_blank" rel="noreferrer">OpenAPI ↗</a></div></div>
+      <nav class="tabs" aria-label="Áreas"><button class="active" type="button" data-tab="client">1 · Cliente</button><button type="button" data-tab="admin">2 · Administrador</button><button type="button" data-tab="analyst">3 · Analista</button></nav>
+      <div class="layout"><div>
+        <section class="panel" data-panel="client"><div class="panel-title"><h2>Cliente</h2><span class="badge" id="client-session">Não autenticado</span></div>
+          <div class="grid">
+            <form autocomplete="off" class="card" data-action="register"><h3>Cadastrar cliente</h3><label>Nome<input name="name" value="Cliente de Teste" required maxlength="120"></label><label>E-mail<input name="email" type="email" required></label><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><button>Cadastrar</button></form>
+            <form autocomplete="off" class="card" data-action="login-client"><h3>Entrar como cliente</h3><label>E-mail<input name="email" type="email" required></label><label>Senha<input name="password" type="password" autocomplete="new-password" required></label><button>Entrar</button></form>
+          </div>
+          <form autocomplete="off" class="card" data-action="create"><h3>1. Dados básicos</h3><div class="grid"><label>Tipo de serviço<select name="serviceType"><option value="INSTALLATION">Instalação</option><option value="MAINTENANCE">Manutenção</option><option value="INSPECTION">Inspeção</option></select></label><label>Título<input name="title" value="Instalação de equipamento" minlength="3" maxlength="80" required></label></div><label>Descrição<textarea name="description" minlength="20" maxlength="1000" required>Solicito a instalação de um novo equipamento no endereço informado.</textarea></label><button>Criar solicitação</button></form>
+          <div class="card"><label>ID da solicitação<input id="client-id" placeholder="Preenchido ao criar; você também pode colar o ID"></label></div>
+          <form autocomplete="off" class="card" data-action="address"><h3>2. Endereço</h3><div class="grid three"><label>CEP<input name="postalCode" value="01001-000" pattern="[0-9]{5}-?[0-9]{3}" required></label><label>Número<input name="number" value="100" required></label><label>Complemento<input name="complement" placeholder="Opcional"></label></div><p class="hint">Rua, bairro, cidade e UF vêm do ViaCEP.</p><button>Completar endereço</button></form>
+          <form autocomplete="off" class="card" data-action="confirmation"><h3>3. Confirmação</h3><div class="grid three"><label>Prioridade<select name="priority"><option value="LOW">Baixa</option><option value="MEDIUM" selected>Média</option><option value="HIGH">Alta</option></select></label><label>Data preferida<input name="preferredDate" type="date" required></label><label>Valor estimado<input name="estimatedValue" type="number" min="0" step="0.01" placeholder="Opcional"></label></div><label class="check"><input name="termsAccepted" type="checkbox" required> Aceito os termos</label><button>Completar confirmação</button></form>
+          <div class="card row"><div><h3>Enviar solicitação</h3><p class="hint">Envia o rascunho após concluir as etapas.</p></div><button type="button" data-action="submit">Enviar</button></div>
+        </section>
+        <section class="panel" data-panel="admin" hidden><div class="panel-title"><h2>Administrador</h2><span class="badge" id="admin-session">Não autenticado</span></div><p class="note">Crie o primeiro administrador com <code>scripts/bootstrap-admin.sh</code>, conforme o README.</p>
+          <form autocomplete="off" class="card" data-action="login-admin"><h3>Entrar como administrador</h3><div class="grid"><label>E-mail<input name="email" type="email" required></label><label>Senha<input name="password" type="password" autocomplete="new-password" required></label></div><button>Entrar</button></form>
+          <form autocomplete="off" class="card" data-action="create-analyst"><h3>Criar analista</h3><div class="grid"><label>Nome<input name="name" value="Analista de Teste" required></label><label>E-mail<input name="email" type="email" required></label><label>Senha<input name="password" type="password" autocomplete="new-password" minlength="8" required></label><label>UFs cobertas, separadas por vírgula<input name="coveredStates" value="SP,RJ" required></label></div><button>Criar analista</button></form>
+        </section>
+        <section class="panel" data-panel="analyst" hidden><div class="panel-title"><h2>Analista</h2><span class="badge" id="analyst-session">Não autenticado</span></div>
+          <form autocomplete="off" class="card" data-action="login-analyst"><h3>Entrar como analista</h3><div class="grid"><label>E-mail<input name="email" type="email" required></label><label>Senha<input name="password" type="password" autocomplete="new-password" required></label></div><button>Entrar</button></form>
+          <div class="card"><h3>Solicitações disponíveis</h3><p class="hint">Pedidos submetidos na sua cobertura e análises atribuídas a você.</p><button type="button" data-action="list">Listar</button><div id="results"></div></div>
+          <form autocomplete="off" class="card" data-action="search"><h3>Buscar no Elasticsearch</h3><div class="grid three"><label>Texto<input name="text" placeholder="Título ou descrição"></label><label>Status<select name="status"><option value="">Todos</option><option>SUBMITTED</option><option>IN_REVIEW</option><option>APPROVED</option><option>REJECTED</option></select></label><label>UF<input name="state" maxlength="2" placeholder="SP"></label></div><button>Buscar</button></form>
+          <div class="card"><label>ID da solicitação para análise<input id="analyst-id" placeholder="Escolha na lista ou cole um ID"></label></div>
+          <div class="card row"><div><h3>Iniciar análise</h3><p class="hint">Reserva a solicitação para você.</p></div><button type="button" data-action="start">Iniciar</button></div>
+          <form autocomplete="off" class="card" data-action="decision"><h3>Registrar decisão</h3><label>Decisão<select name="outcome"><option value="APPROVED">Aprovar</option><option value="REJECTED">Rejeitar</option></select></label><label>Parecer<textarea name="comment" minlength="10" maxlength="1000" required>Parecer favorável para atendimento.</textarea></label><button>Registrar decisão</button></form>
+        </section>
+      </div><aside class="response"><div class="response-head"><h2>Última resposta</h2><span class="badge" id="status">Aguardando</span></div><p class="hint" id="operation">Execute uma ação para ver o resultado.</p><pre id="output" aria-live="polite">{}</pre></aside></div>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

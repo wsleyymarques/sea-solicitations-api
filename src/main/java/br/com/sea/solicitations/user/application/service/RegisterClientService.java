@@ -1,5 +1,7 @@
 package br.com.sea.solicitations.user.application.service;
 
+import br.com.sea.solicitations.audit.application.annotation.Audited;
+import br.com.sea.solicitations.audit.domain.AuditAction;
 import br.com.sea.solicitations.user.application.exception.EmailAlreadyRegisteredException;
 import br.com.sea.solicitations.user.application.port.in.RegisterClientCommand;
 import br.com.sea.solicitations.user.application.port.in.RegisterClientResult;
@@ -23,6 +25,7 @@ public class RegisterClientService implements RegisterClientUseCase {
     }
 
     @Override
+    @Audited(AuditAction.USER_CREATED)
     @Transactional
     public RegisterClientResult register(RegisterClientCommand command) {
         Objects.requireNonNull(command, "Register client command is required");

@@ -78,6 +78,26 @@ class SolicitationTest {
     }
 
     @Test
+    void rejectionIsTerminalAndRetainsTheFirstDecision() {
+        Solicitation solicitation = submittedSolicitation();
+        UUID analystId = UUID.randomUUID();
+        Instant decidedAt = NOW.plusSeconds(120);
+        solicitation.startReview(analystId, NOW.plusSeconds(60));
+
+        solicitation.reject(analystId, " 1234567890 ", decidedAt);
+
+        assertThat(solicitation.getStatus()).isEqualTo(SolicitationStatus.REJECTED);
+        assertThat(solicitation.getDecision().getAnalystId()).isEqualTo(analystId);
+        assertThat(solicitation.getDecision().getComment()).isEqualTo("1234567890");
+        assertThat(solicitation.getDecision().getDecidedAt()).isEqualTo(decidedAt);
+
+        assertThatThrownBy(() -> solicitation.approve(
+                analystId, "Novo parecer favoravel.", NOW.plusSeconds(180)
+        )).isInstanceOf(IllegalStateException.class);
+        assertThat(solicitation.getDecision().getComment()).isEqualTo("1234567890");
+    }
+
+    @Test
     void preventsEditingAfterSubmission() {
         Solicitation solicitation = submittedSolicitation();
 
