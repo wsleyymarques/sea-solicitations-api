@@ -130,7 +130,9 @@ class ApiFlowIT {
                 {"/solicitations/{id}/submit", "post"},
                 {"/analyst/solicitations", "get"},
                 {"/analyst/solicitations/search", "get"},
+                {"/analyst/solicitations/{id}", "get"},
                 {"/analyst/solicitations/{id}/start", "post"},
+                {"/analyst/solicitations/{id}/decide", "post"},
                 {"/analyst/solicitations/{id}/decision", "post"}
         };
         for (String[] operation : protectedOperations) {
@@ -183,6 +185,20 @@ class ApiFlowIT {
 
         assertThat(get("/analyst/solicitations?page=0&size=20", assignedToken)
                 .getBody().path("content").toString()).contains(approvedId.toString());
+        ResponseEntity<JsonNode> submittedDetail = get(
+                "/analyst/solicitations/" + approvedId, assignedToken);
+        assertThat(submittedDetail.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(submittedDetail.getBody().path("status").asText()).isEqualTo("SUBMITTED");
+        assertThat(submittedDetail.getBody().path("address").path("state").asText()).isEqualTo("SP");
+        assertError(get("/analyst/solicitations/" + approvedId, outsideCoverageToken),
+                HttpStatus.FORBIDDEN, "SOLICITATION_REVIEW_ACCESS_DENIED");
+        ResponseEntity<JsonNode> canonicalSearch = get(
+                "/analyst/solicitations/search?state=RJ&dateFrom=2026-11-01"
+                        + "&dateTo=2026-11-30&sort=CREATED_AT&direction=ASC",
+                assignedToken
+        );
+        assertThat(canonicalSearch.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(canonicalSearch.getBody().path("content").isEmpty()).isTrue();
         assertError(post("/analyst/solicitations/" + approvedId + "/start",
                 outsideCoverageToken, null),
                 HttpStatus.FORBIDDEN, "SOLICITATION_REVIEW_ACCESS_DENIED");
@@ -190,8 +206,12 @@ class ApiFlowIT {
                 "/analyst/solicitations/" + approvedId + "/start", assignedToken, null);
         assertThat(started.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(started.getBody().path("status").asText()).isEqualTo("IN_REVIEW");
+        assertThat(get("/analyst/solicitations/" + approvedId, assignedToken)
+                .getBody().path("status").asText()).isEqualTo("IN_REVIEW");
+        assertError(get("/analyst/solicitations/" + approvedId, otherAnalystToken),
+                HttpStatus.FORBIDDEN, "SOLICITATION_REVIEW_ACCESS_DENIED");
 
-        String decisionPath = "/analyst/solicitations/" + approvedId + "/decision";
+        String decisionPath = "/analyst/solicitations/" + approvedId + "/decide";
         Map<String, Object> approval = Map.of(
                 "outcome", "APPROVED", "comment", "Parecer favoravel para atendimento."
         );

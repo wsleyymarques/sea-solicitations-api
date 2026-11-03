@@ -149,18 +149,30 @@ public class AnalystSolicitationController {
             @RequestParam(required = false) ServiceType serviceType,
             @RequestParam(required = false) Priority priority,
             @RequestParam(required = false) FederativeUnit state,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            @RequestParam(name = "dateFrom", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(name = "submittedFrom", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate submittedFrom,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            @RequestParam(name = "dateTo", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(name = "submittedTo", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
             LocalDate submittedTo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "SUBMITTED_AT") SearchSortField sortBy,
+            @RequestParam(name = "sort", required = false) SearchSortField sort,
+            @RequestParam(name = "sortBy", required = false) SearchSortField sortBy,
             @RequestParam(defaultValue = "DESC") SearchDirection direction
     ) {
         SearchSolicitationsQuery query = new SearchSolicitationsQuery(
                 UUID.fromString(jwt.getSubject()), coveredStates(jwt), text, status, serviceType,
-                priority, state, submittedFrom, submittedTo, page, size, sortBy, direction
+                priority, state,
+                canonical(dateFrom, submittedFrom, null),
+                canonical(dateTo, submittedTo, null),
+                page, size,
+                canonical(sort, sortBy, SearchSortField.SUBMITTED_AT),
+                direction
         );
         SearchSolicitationsResult result = searchSolicitationsUseCase.search(query);
         return ResponseEntity.ok(SearchSolicitationsResponse.from(result));
@@ -184,7 +196,7 @@ public class AnalystSolicitationController {
         return ResponseEntity.ok(StartSolicitationReviewResponse.from(result));
     }
 
-    @PostMapping("/{id}/decision")
+    @PostMapping({"/{id}/decide", "/{id}/decision"})
     @Operation(summary = "Aprovar ou rejeitar solicitacao")
     @ApiResponse(responseCode = "400", description = "Decisao invalida",
             content = @Content(mediaType = "application/json",
@@ -206,6 +218,13 @@ public class AnalystSolicitationController {
         );
         DecideSolicitationResult result = decideSolicitationUseCase.decide(command);
         return ResponseEntity.ok(DecideSolicitationResponse.from(result));
+    }
+
+    private static <T> T canonical(T canonical, T legacy, T fallback) {
+        if (canonical != null) {
+            return canonical;
+        }
+        return legacy != null ? legacy : fallback;
     }
 
     private static Set<FederativeUnit> coveredStates(Jwt jwt) {

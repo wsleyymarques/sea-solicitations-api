@@ -206,11 +206,11 @@ class AnalystSolicitationControllerTest {
                         .param("serviceType", "INSTALLATION")
                         .param("priority", "HIGH")
                         .param("state", "SP")
-                        .param("submittedFrom", "2026-11-01")
-                        .param("submittedTo", "2026-11-03")
+                        .param("dateFrom", "2026-11-01")
+                        .param("dateTo", "2026-11-03")
                         .param("page", "1")
                         .param("size", "5")
-                        .param("sortBy", "CREATED_AT")
+                        .param("sort", "CREATED_AT")
                         .param("direction", "ASC")
                         .with(jwt().jwt(token -> token
                                         .subject(analystId.toString())
@@ -235,6 +235,57 @@ class AnalystSolicitationControllerTest {
         assertThat(captor.getValue().submittedTo()).isEqualTo(LocalDate.of(2026, 11, 3));
         assertThat(captor.getValue().sortBy()).isEqualTo(SearchSortField.CREATED_AT);
         assertThat(captor.getValue().direction()).isEqualTo(SearchDirection.ASC);
+    }
+
+    @Test
+    void acceptsLegacySearchParameterAliases() throws Exception {
+        when(searchUseCase.search(any(SearchSolicitationsQuery.class))).thenReturn(
+                new SearchSolicitationsResult(List.of(), 0, 20, 0, 0)
+        );
+
+        mockMvc.perform(get("/analyst/solicitations/search")
+                        .param("submittedFrom", "2026-10-01")
+                        .param("submittedTo", "2026-10-31")
+                        .param("sortBy", "PREFERRED_DATE")
+                        .with(jwt().jwt(token -> token
+                                        .subject(UUID.randomUUID().toString())
+                                        .claim("coveredStates", List.of("SP")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ANALYST"))))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<SearchSolicitationsQuery> captor =
+                ArgumentCaptor.forClass(SearchSolicitationsQuery.class);
+        verify(searchUseCase).search(captor.capture());
+        assertThat(captor.getValue().submittedFrom()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(captor.getValue().submittedTo()).isEqualTo(LocalDate.of(2026, 10, 31));
+        assertThat(captor.getValue().sortBy()).isEqualTo(SearchSortField.PREFERRED_DATE);
+    }
+
+    @Test
+    void canonicalSearchParametersTakePrecedenceOverLegacyAliases() throws Exception {
+        when(searchUseCase.search(any(SearchSolicitationsQuery.class))).thenReturn(
+                new SearchSolicitationsResult(List.of(), 0, 20, 0, 0)
+        );
+
+        mockMvc.perform(get("/analyst/solicitations/search")
+                        .param("dateFrom", "2026-11-05")
+                        .param("submittedFrom", "2026-10-01")
+                        .param("dateTo", "2026-11-06")
+                        .param("submittedTo", "2026-10-31")
+                        .param("sort", "SUBMITTED_AT")
+                        .param("sortBy", "PREFERRED_DATE")
+                        .with(jwt().jwt(token -> token
+                                        .subject(UUID.randomUUID().toString())
+                                        .claim("coveredStates", List.of("SP")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ANALYST"))))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<SearchSolicitationsQuery> captor =
+                ArgumentCaptor.forClass(SearchSolicitationsQuery.class);
+        verify(searchUseCase).search(captor.capture());
+        assertThat(captor.getValue().submittedFrom()).isEqualTo(LocalDate.of(2026, 11, 5));
+        assertThat(captor.getValue().submittedTo()).isEqualTo(LocalDate.of(2026, 11, 6));
+        assertThat(captor.getValue().sortBy()).isEqualTo(SearchSortField.SUBMITTED_AT);
     }
 
     @Test
@@ -288,7 +339,7 @@ class AnalystSolicitationControllerTest {
                         "Parecer favoravel para atendimento.", decidedAt)
         );
 
-        mockMvc.perform(post("/analyst/solicitations/{id}/decision", id)
+        mockMvc.perform(post("/analyst/solicitations/{id}/decide", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"outcome\":\"APPROVED\",\"comment\":\"Parecer favoravel para atendimento.\"}")
                         .with(jwt().jwt(token -> token
