@@ -75,7 +75,7 @@ public class JpaSolicitationRepositoryAdapter implements SolicitationRepository 
     @Override
     public UUID save(Solicitation solicitation) {
         try {
-            Solicitation savedSolicitation = solicitationJpaRepository.save(
+            Solicitation savedSolicitation = solicitationJpaRepository.saveAndFlush(
                     Objects.requireNonNull(solicitation, "Solicitation is required")
             );
             return savedSolicitation.getId();

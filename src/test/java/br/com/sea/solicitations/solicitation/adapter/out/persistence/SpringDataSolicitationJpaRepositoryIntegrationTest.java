@@ -1,8 +1,11 @@
 package br.com.sea.solicitations.solicitation.adapter.out.persistence;
 
 import br.com.sea.solicitations.shared.domain.FederativeUnit;
+import br.com.sea.solicitations.solicitation.application.exception.SolicitationConcurrentUpdateException;
 import br.com.sea.solicitations.solicitation.application.port.out.SolicitationPage;
 import br.com.sea.solicitations.solicitation.application.port.out.SolicitationRepository;
+import br.com.sea.solicitations.solicitation.domain.Solicitation;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +21,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest(properties = {
         "spring.flyway.enabled=true",
@@ -38,6 +42,9 @@ class SpringDataSolicitationJpaRepositoryIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private EntityManager entityManager;
 
     @Test
     void filtersByCoverageStatusAndAssignmentWithStablePagination() {
@@ -101,6 +108,28 @@ class SpringDataSolicitationJpaRepositoryIntegrationTest {
                 .containsExactly(ownReview);
         assertThat(secondPage.totalElements()).isEqualTo(3);
         assertThat(secondPage.totalPages()).isEqualTo(2);
+    }
+
+    @Test
+    void translatesARealPostgresStaleVersionWriteToTheApplicationConflict() {
+        insertUser(CLIENT_ID, "stale-client@example.com", "CLIENT");
+        insertUser(ANALYST_ID, "stale-analyst@example.com", "ANALYST");
+        insertUser(OTHER_ANALYST_ID, "stale-other-analyst@example.com", "ANALYST");
+        UUID solicitationId = UUID.fromString("30000000-0000-0000-0000-000000000010");
+        insertSolicitation(solicitationId, "SP", "SUBMITTED", null, NOW, null);
+
+        Solicitation firstWriter = repository.findById(solicitationId).orElseThrow();
+        entityManager.detach(firstWriter);
+        Solicitation staleWriter = repository.findById(solicitationId).orElseThrow();
+        entityManager.detach(staleWriter);
+
+        firstWriter.startReview(ANALYST_ID, NOW.plusSeconds(1));
+        repository.save(firstWriter);
+
+        staleWriter.startReview(OTHER_ANALYST_ID, NOW.plusSeconds(2));
+        assertThatThrownBy(() -> repository.save(staleWriter))
+                .isInstanceOf(SolicitationConcurrentUpdateException.class)
+                .hasMessage("Solicitation was updated by another request");
     }
 
     private void insertUser(UUID id, String email, String role) {

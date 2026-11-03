@@ -101,11 +101,22 @@ class JpaSolicitationRepositoryAdapterTest {
     @Test
     void translatesOptimisticLockFailureToApplicationConflict() {
         Solicitation solicitation = new Solicitation(UUID.randomUUID());
-        when(solicitationJpaRepository.save(solicitation))
+        when(solicitationJpaRepository.saveAndFlush(solicitation))
                 .thenThrow(new ObjectOptimisticLockingFailureException(Solicitation.class, UUID.randomUUID()));
 
         assertThatThrownBy(() -> adapter.save(solicitation))
                 .isInstanceOf(SolicitationConcurrentUpdateException.class)
                 .hasMessage("Solicitation was updated by another request");
+    }
+
+    @Test
+    void flushesTheWriteBeforeReturningSoOptimisticLockFailuresAreTranslated() {
+        Solicitation solicitation = new Solicitation(UUID.randomUUID());
+        when(solicitationJpaRepository.saveAndFlush(solicitation)).thenReturn(solicitation);
+
+        UUID savedId = adapter.save(solicitation);
+
+        assertThat(savedId).isEqualTo(solicitation.getId());
+        verify(solicitationJpaRepository).saveAndFlush(solicitation);
     }
 }
