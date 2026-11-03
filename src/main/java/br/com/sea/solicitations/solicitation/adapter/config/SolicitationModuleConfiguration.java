@@ -7,6 +7,7 @@ import br.com.sea.solicitations.solicitation.application.port.in.DecideSolicitat
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationAddressUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.CompleteSolicitationConfirmationUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.ListAnalystSolicitationsUseCase;
+import br.com.sea.solicitations.solicitation.application.port.in.GetAnalystSolicitationUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.SearchSolicitationsUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.SubmitSolicitationUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.StartSolicitationReviewUseCase;
@@ -18,6 +19,7 @@ import br.com.sea.solicitations.solicitation.application.service.CompleteSolicit
 import br.com.sea.solicitations.solicitation.application.service.CreateSolicitationService;
 import br.com.sea.solicitations.solicitation.application.service.DecideSolicitationService;
 import br.com.sea.solicitations.solicitation.application.service.ListAnalystSolicitationsService;
+import br.com.sea.solicitations.solicitation.application.service.GetAnalystSolicitationService;
 import br.com.sea.solicitations.solicitation.application.service.OutboxSolicitationRepository;
 import br.com.sea.solicitations.solicitation.application.service.SearchSolicitationsService;
 import br.com.sea.solicitations.solicitation.application.service.SubmitSolicitationService;
@@ -99,6 +101,13 @@ public class SolicitationModuleConfiguration {
             SolicitationRepository solicitationRepository
     ) {
         return new ListAnalystSolicitationsService(solicitationRepository);
+    }
+
+    @Bean
+    GetAnalystSolicitationUseCase getAnalystSolicitationUseCase(
+            SolicitationRepository solicitationRepository
+    ) {
+        return new GetAnalystSolicitationService(solicitationRepository);
     }
 
     @Bean

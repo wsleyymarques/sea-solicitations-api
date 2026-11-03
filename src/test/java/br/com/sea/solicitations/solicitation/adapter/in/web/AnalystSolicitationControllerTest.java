@@ -5,10 +5,15 @@ import br.com.sea.solicitations.shared.adapter.in.web.security.SecurityConfigura
 import br.com.sea.solicitations.shared.adapter.in.web.security.SecurityErrorHandler;
 import br.com.sea.solicitations.shared.domain.FederativeUnit;
 import br.com.sea.solicitations.solicitation.application.exception.SearchUnavailableException;
+import br.com.sea.solicitations.solicitation.application.exception.SolicitationNotFoundException;
+import br.com.sea.solicitations.solicitation.application.exception.SolicitationReviewAccessDeniedException;
 import br.com.sea.solicitations.solicitation.application.port.in.AnalystSolicitationSummary;
 import br.com.sea.solicitations.solicitation.application.port.in.DecideSolicitationCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.DecideSolicitationResult;
 import br.com.sea.solicitations.solicitation.application.port.in.DecideSolicitationUseCase;
+import br.com.sea.solicitations.solicitation.application.port.in.GetAnalystSolicitationQuery;
+import br.com.sea.solicitations.solicitation.application.port.in.GetAnalystSolicitationResult;
+import br.com.sea.solicitations.solicitation.application.port.in.GetAnalystSolicitationUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.ListAnalystSolicitationsQuery;
 import br.com.sea.solicitations.solicitation.application.port.in.ListAnalystSolicitationsResult;
 import br.com.sea.solicitations.solicitation.application.port.in.ListAnalystSolicitationsUseCase;
@@ -24,6 +29,7 @@ import br.com.sea.solicitations.solicitation.application.port.in.StartSolicitati
 import br.com.sea.solicitations.solicitation.domain.Priority;
 import br.com.sea.solicitations.solicitation.domain.ServiceType;
 import br.com.sea.solicitations.solicitation.domain.SolicitationStatus;
+import br.com.sea.solicitations.solicitation.domain.SolicitationStep;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +43,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -71,7 +78,113 @@ class AnalystSolicitationControllerTest {
     private SearchSolicitationsUseCase searchUseCase;
 
     @MockitoBean
+    private GetAnalystSolicitationUseCase getUseCase;
+
+    @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    @Test
+    void getsCompleteSolicitationUsingAnalystIdentityAndCoverageFromJwt() throws Exception {
+        UUID id = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        UUID analystId = UUID.randomUUID();
+        Instant submittedAt = Instant.parse("2026-11-02T12:00:00Z");
+        when(getUseCase.get(any(GetAnalystSolicitationQuery.class))).thenReturn(
+                new GetAnalystSolicitationResult(
+                        id,
+                        clientId,
+                        new GetAnalystSolicitationResult.BasicDataDetails(
+                                ServiceType.INSTALLATION,
+                                "Instalacao de equipamento",
+                                "Solicito a instalacao de um novo equipamento no endereco informado."
+                        ),
+                        new GetAnalystSolicitationResult.AddressDetails(
+                                "01001000", "Praca da Se", "Se", "Sao Paulo",
+                                FederativeUnit.SP, "100", "Apto 12"
+                        ),
+                        new GetAnalystSolicitationResult.ConfirmationDetails(
+                                Priority.HIGH, LocalDate.of(2026, 11, 4),
+                                new BigDecimal("100.00"), true
+                        ),
+                        SolicitationStatus.SUBMITTED,
+                        SolicitationStep.COMPLETED,
+                        null,
+                        submittedAt,
+                        null,
+                        null,
+                        Instant.parse("2026-11-01T10:00:00Z"),
+                        Instant.parse("2026-11-02T12:00:00Z")
+                )
+        );
+
+        mockMvc.perform(get("/analyst/solicitations/{id}", id)
+                        .with(jwt().jwt(token -> token
+                                        .subject(analystId.toString())
+                                        .claim("coveredStates", List.of("SP", "RJ")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ANALYST"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id.toString()))
+                .andExpect(jsonPath("$.clientId").value(clientId.toString()))
+                .andExpect(jsonPath("$.basicData.serviceType").value("INSTALLATION"))
+                .andExpect(jsonPath("$.basicData.title").value("Instalacao de equipamento"))
+                .andExpect(jsonPath("$.address.state").value("SP"))
+                .andExpect(jsonPath("$.address.complement").value("Apto 12"))
+                .andExpect(jsonPath("$.confirmation.priority").value("HIGH"))
+                .andExpect(jsonPath("$.confirmation.estimatedValue").value(100.00))
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.currentStep").value("COMPLETED"))
+                .andExpect(jsonPath("$.submittedAt").value(submittedAt.toString()));
+
+        ArgumentCaptor<GetAnalystSolicitationQuery> captor =
+                ArgumentCaptor.forClass(GetAnalystSolicitationQuery.class);
+        verify(getUseCase).get(captor.capture());
+        assertThat(captor.getValue().solicitationId()).isEqualTo(id);
+        assertThat(captor.getValue().analystId()).isEqualTo(analystId);
+        assertThat(captor.getValue().coveredStates()).containsExactlyInAnyOrder(
+                FederativeUnit.SP, FederativeUnit.RJ
+        );
+    }
+
+    @Test
+    void protectsDetailAndRejectsMalformedCoverage() throws Exception {
+        UUID id = UUID.randomUUID();
+
+        mockMvc.perform(get("/analyst/solicitations/{id}", id))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(get("/analyst/solicitations/{id}", id)
+                        .with(jwt().jwt(token -> token.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_CLIENT"))))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/analyst/solicitations/{id}", id)
+                        .with(jwt().jwt(token -> token.subject(UUID.randomUUID().toString()))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ANALYST"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SOLICITATION_REVIEW_ACCESS_DENIED"));
+
+        verifyNoInteractions(getUseCase);
+    }
+
+    @Test
+    void mapsDetailNotFoundAndAccessDeniedErrors() throws Exception {
+        UUID id = UUID.randomUUID();
+        var analystToken = jwt().jwt(token -> token
+                        .subject(UUID.randomUUID().toString())
+                        .claim("coveredStates", List.of("SP")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ANALYST"));
+        when(getUseCase.get(any(GetAnalystSolicitationQuery.class)))
+                .thenThrow(new SolicitationNotFoundException())
+                .thenThrow(new SolicitationReviewAccessDeniedException());
+
+        mockMvc.perform(get("/analyst/solicitations/{id}", id).with(analystToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("SOLICITATION_NOT_FOUND"));
+
+        mockMvc.perform(get("/analyst/solicitations/{id}", id).with(analystToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SOLICITATION_REVIEW_ACCESS_DENIED"));
+    }
 
     @Test
     void searchesWithJwtCoverageAndFilters() throws Exception {

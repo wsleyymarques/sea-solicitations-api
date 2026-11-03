@@ -3,6 +3,7 @@ package br.com.sea.solicitations.solicitation.adapter.in.web;
 import br.com.sea.solicitations.shared.domain.FederativeUnit;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.DecideSolicitationRequest;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.DecideSolicitationResponse;
+import br.com.sea.solicitations.solicitation.adapter.in.web.dto.GetAnalystSolicitationResponse;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.ListAnalystSolicitationsResponse;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.SearchSolicitationsResponse;
 import br.com.sea.solicitations.solicitation.adapter.in.web.dto.StartSolicitationReviewResponse;
@@ -10,6 +11,9 @@ import br.com.sea.solicitations.solicitation.application.exception.SolicitationR
 import br.com.sea.solicitations.solicitation.application.port.in.DecideSolicitationCommand;
 import br.com.sea.solicitations.solicitation.application.port.in.DecideSolicitationResult;
 import br.com.sea.solicitations.solicitation.application.port.in.DecideSolicitationUseCase;
+import br.com.sea.solicitations.solicitation.application.port.in.GetAnalystSolicitationQuery;
+import br.com.sea.solicitations.solicitation.application.port.in.GetAnalystSolicitationResult;
+import br.com.sea.solicitations.solicitation.application.port.in.GetAnalystSolicitationUseCase;
 import br.com.sea.solicitations.solicitation.application.port.in.ListAnalystSolicitationsQuery;
 import br.com.sea.solicitations.solicitation.application.port.in.ListAnalystSolicitationsResult;
 import br.com.sea.solicitations.solicitation.application.port.in.ListAnalystSolicitationsUseCase;
@@ -70,12 +74,14 @@ public class AnalystSolicitationController {
     private final StartSolicitationReviewUseCase startSolicitationReviewUseCase;
     private final DecideSolicitationUseCase decideSolicitationUseCase;
     private final SearchSolicitationsUseCase searchSolicitationsUseCase;
+    private final GetAnalystSolicitationUseCase getAnalystSolicitationUseCase;
 
     public AnalystSolicitationController(
             ListAnalystSolicitationsUseCase listAnalystSolicitationsUseCase,
             StartSolicitationReviewUseCase startSolicitationReviewUseCase,
             DecideSolicitationUseCase decideSolicitationUseCase,
-            SearchSolicitationsUseCase searchSolicitationsUseCase
+            SearchSolicitationsUseCase searchSolicitationsUseCase,
+            GetAnalystSolicitationUseCase getAnalystSolicitationUseCase
     ) {
         this.listAnalystSolicitationsUseCase = Objects.requireNonNull(
                 listAnalystSolicitationsUseCase, "List analyst solicitations use case is required"
@@ -88,6 +94,9 @@ public class AnalystSolicitationController {
         );
         this.searchSolicitationsUseCase = Objects.requireNonNull(
                 searchSolicitationsUseCase, "Search solicitations use case is required"
+        );
+        this.getAnalystSolicitationUseCase = Objects.requireNonNull(
+                getAnalystSolicitationUseCase, "Get analyst solicitation use case is required"
         );
     }
 
@@ -109,6 +118,22 @@ public class AnalystSolicitationController {
         );
         ListAnalystSolicitationsResult result = listAnalystSolicitationsUseCase.list(query);
         return ResponseEntity.ok(ListAnalystSolicitationsResponse.from(result));
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Consultar solicitacao visivel ao analista")
+    @ApiResponse(responseCode = "404", description = "Solicitacao nao encontrada")
+    public ResponseEntity<GetAnalystSolicitationResponse> get(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        GetAnalystSolicitationQuery query = new GetAnalystSolicitationQuery(
+                id,
+                UUID.fromString(jwt.getSubject()),
+                coveredStates(jwt)
+        );
+        GetAnalystSolicitationResult result = getAnalystSolicitationUseCase.get(query);
+        return ResponseEntity.ok(GetAnalystSolicitationResponse.from(result));
     }
 
     @GetMapping("/search")
