@@ -144,7 +144,7 @@ public class AnalystSolicitationController {
     @ApiResponse(responseCode = "503", description = "Busca indisponivel")
     public ResponseEntity<SearchSolicitationsResponse> search(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestParam(required = false) String text,
+            @RequestParam(name = "q", required = false) String queryText,
             @RequestParam(required = false) SolicitationStatus status,
             @RequestParam(required = false) ServiceType serviceType,
             @RequestParam(required = false) Priority priority,
@@ -166,7 +166,7 @@ public class AnalystSolicitationController {
             @RequestParam(defaultValue = "DESC") SearchDirection direction
     ) {
         SearchSolicitationsQuery query = new SearchSolicitationsQuery(
-                UUID.fromString(jwt.getSubject()), coveredStates(jwt), text, status, serviceType,
+                UUID.fromString(jwt.getSubject()), coveredStates(jwt), queryText, status, serviceType,
                 priority, state,
                 canonical(dateFrom, submittedFrom, null),
                 canonical(dateTo, submittedTo, null),

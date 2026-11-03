@@ -61,9 +61,13 @@ function showError(operation: string, error: unknown): void {
 function renderResults(body: unknown): void {
   const container = get<HTMLDivElement>('#results')
   container.replaceChildren()
-  if (!body || typeof body !== 'object' || !('content' in body) || !Array.isArray(body.content)) return
-  if (body.content.length === 0) { container.textContent = 'Nenhuma solicitação encontrada.'; return }
-  for (const item of body.content) {
+  if (!body || typeof body !== 'object') return
+  const results = 'items' in body && Array.isArray(body.items)
+    ? body.items
+    : 'content' in body && Array.isArray(body.content) ? body.content : null
+  if (!results) return
+  if (results.length === 0) { container.textContent = 'Nenhuma solicitação encontrada.'; return }
+  for (const item of results) {
     const row = document.createElement('div')
     row.className = 'result'
     const details = document.createElement('div')

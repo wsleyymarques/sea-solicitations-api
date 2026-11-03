@@ -201,7 +201,7 @@ class AnalystSolicitationControllerTest {
         );
 
         mockMvc.perform(get("/analyst/solicitations/search")
-                        .param("text", " equipamento ")
+                        .param("q", " equipamento ")
                         .param("status", "APPROVED")
                         .param("serviceType", "INSTALLATION")
                         .param("priority", "HIGH")
@@ -219,10 +219,13 @@ class AnalystSolicitationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.size").value(5))
-                .andExpect(jsonPath("$.totalElements").value(6))
-                .andExpect(jsonPath("$.content[0].id").value(solicitationId.toString()))
-                .andExpect(jsonPath("$.content[0].status").value("APPROVED"))
-                .andExpect(jsonPath("$.content[0].state").value("SP"));
+                .andExpect(jsonPath("$.total").value(6))
+                .andExpect(jsonPath("$.items[0].id").value(solicitationId.toString()))
+                .andExpect(jsonPath("$.items[0].status").value("APPROVED"))
+                .andExpect(jsonPath("$.items[0].state").value("SP"))
+                .andExpect(jsonPath("$.content").doesNotExist())
+                .andExpect(jsonPath("$.totalElements").doesNotExist())
+                .andExpect(jsonPath("$.totalPages").doesNotExist());
 
         ArgumentCaptor<SearchSolicitationsQuery> captor =
                 ArgumentCaptor.forClass(SearchSolicitationsQuery.class);
@@ -341,7 +344,7 @@ class AnalystSolicitationControllerTest {
 
         mockMvc.perform(post("/analyst/solicitations/{id}/decide", id)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"outcome\":\"APPROVED\",\"comment\":\"Parecer favoravel para atendimento.\"}")
+                        .content("{\"outcome\":\"APPROVE\",\"comment\":\"Parecer favoravel para atendimento.\"}")
                         .with(jwt().jwt(token -> token
                                         .subject(analystId.toString())
                                         .claim("coveredStates", List.of("SP", "RJ")))
@@ -361,7 +364,7 @@ class AnalystSolicitationControllerTest {
         assertThat(captor.getValue().coveredStates()).containsExactlyInAnyOrder(
                 FederativeUnit.SP, FederativeUnit.RJ
         );
-        assertThat(captor.getValue().outcome().name()).isEqualTo("APPROVED");
+        assertThat(captor.getValue().outcome().name()).isEqualTo("APPROVE");
         assertThat(captor.getValue().comment()).isEqualTo("Parecer favoravel para atendimento.");
     }
 
@@ -375,14 +378,14 @@ class AnalystSolicitationControllerTest {
 
         mockMvc.perform(post("/analyst/solicitations/{id}/decision", id)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"outcome\":\"APPROVED\",\"comment\":\"short\"}")
+                        .content("{\"outcome\":\"APPROVE\",\"comment\":\"short\"}")
                         .with(token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
         mockMvc.perform(post("/analyst/solicitations/{id}/decision", id)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"outcome\":\"SUBMITTED\",\"comment\":\"Comentario suficiente.\"}")
+                        .content("{\"outcome\":\"APPROVED\",\"comment\":\"Comentario suficiente.\"}")
                         .with(token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("MALFORMED_JSON"));
@@ -396,7 +399,7 @@ class AnalystSolicitationControllerTest {
 
         mockMvc.perform(post("/analyst/solicitations/{id}/decision", id)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"outcome\":\"REJECTED\",\"comment\":\"             \"}")
+                        .content("{\"outcome\":\"REJECT\",\"comment\":\"             \"}")
                         .with(token))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -421,7 +424,7 @@ class AnalystSolicitationControllerTest {
 
         mockMvc.perform(post("/analyst/solicitations/{id}/decision", id)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"outcome\":\"REJECTED\",\"comment\":\"  Documentacao insuficiente.  \"}")
+                        .content("{\"outcome\":\"REJECT\",\"comment\":\"  Documentacao insuficiente.  \"}")
                         .with(jwt().jwt(token -> token
                                         .subject(analystId.toString())
                                         .claim("coveredStates", List.of("SP")))
@@ -438,7 +441,7 @@ class AnalystSolicitationControllerTest {
     @Test
     void deniesDecisionWhenCoverageClaimIsMissingOrRoleIsClient() throws Exception {
         UUID id = UUID.randomUUID();
-        String body = "{\"outcome\":\"REJECTED\",\"comment\":\"Documentacao insuficiente.\"}";
+        String body = "{\"outcome\":\"REJECT\",\"comment\":\"Documentacao insuficiente.\"}";
 
         mockMvc.perform(post("/analyst/solicitations/{id}/decision", id)
                         .contentType(MediaType.APPLICATION_JSON)

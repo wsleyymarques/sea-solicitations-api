@@ -81,6 +81,18 @@ class GetAnalystSolicitationServiceTest {
     }
 
     @Test
+    void deniesSubmittedSolicitationThatAlreadyHasAnAssignedAnalyst() {
+        UUID id = UUID.randomUUID();
+        Solicitation solicitation = submitted(UUID.randomUUID());
+        ReflectionTestUtils.setField(solicitation, "assignedAnalystId", UUID.randomUUID());
+        persisted(solicitation, id);
+        when(repository.findById(id)).thenReturn(Optional.of(solicitation));
+
+        assertThatThrownBy(() -> service.get(query(id, UUID.randomUUID(), FederativeUnit.SP)))
+                .isInstanceOf(SolicitationReviewAccessDeniedException.class);
+    }
+
+    @Test
     void returnsTerminalSolicitationOnlyToAssignedAnalyst() {
         UUID id = UUID.randomUUID();
         UUID analystId = UUID.randomUUID();

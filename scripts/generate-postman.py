@@ -119,8 +119,10 @@ collection = {
         ),
         request(
             "12 · Buscar no Elasticsearch", "GET",
-            "/analyst/solicitations/search?state=SP&dateFrom=2020-01-01&dateTo=2099-12-31&sort=SUBMITTED_AT&direction=DESC&page=0&size=20",
-            token="analystToken", events=check(200),
+            "/analyst/solicitations/search?q=equipamento&state=SP&dateFrom=2020-01-01&dateTo=2099-12-31&sort=SUBMITTED_AT&direction=DESC&page=0&size=20",
+            token="analystToken", events=check(200, [
+                "pm.test('Contrato do flyer', () => pm.expect(Object.keys(pm.response.json()).sort()).to.eql(['items','page','size','total'].sort()));"
+            ]),
         ),
         request(
             "13 · Iniciar análise", "POST", "/analyst/solicitations/{{solicitationId}}/start",
@@ -130,7 +132,7 @@ collection = {
         request(
             "14 · Aprovar solicitação", "POST", "/analyst/solicitations/{{solicitationId}}/decide",
             token="analystToken",
-            body='{"outcome":"APPROVED","comment":"Parecer favorável para atendimento."}',
+            body='{"outcome":"APPROVE","comment":"Parecer favorável para atendimento."}',
             events=check(200, ["pm.test('Aprovada', () => pm.expect(pm.response.json().status).to.eql('APPROVED'));"]),
         ),
         request(
@@ -159,7 +161,7 @@ collection = {
         request(
             "20 · Rejeitar solicitação", "POST",
             "/analyst/solicitations/{{rejectSolicitationId}}/decide", token="analystToken",
-            body='{"outcome":"REJECTED","comment":"Parecer desfavorável após análise do pedido."}',
+            body='{"outcome":"REJECT","comment":"Parecer desfavorável após análise do pedido."}',
             events=check(200, ["pm.test('Rejeitada', () => pm.expect(pm.response.json().status).to.eql('REJECTED'));"]),
         ),
     ],

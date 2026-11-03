@@ -53,7 +53,7 @@ public class DecideSolicitationService implements DecideSolicitationUseCase {
             throw new InvalidSolicitationStateException("Only solicitations in review can be decided");
         }
 
-        if (command.outcome() == DecisionOutcome.APPROVED) {
+        if (command.outcome() == DecisionOutcome.APPROVE) {
             solicitation.approve(command.analystId(), command.comment(), clock.instant());
         } else {
             solicitation.reject(command.analystId(), command.comment(), clock.instant());

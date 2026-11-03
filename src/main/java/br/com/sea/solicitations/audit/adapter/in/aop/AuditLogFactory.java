@@ -75,7 +75,7 @@ public class AuditLogFactory {
     private static AuditAction actionFor(AuditAction declared, Object command) {
         if (declared == AuditAction.SOLICITATION_APPROVED
                 && command instanceof DecideSolicitationCommand decision
-                && decision.outcome() == DecisionOutcome.REJECTED) {
+                && decision.outcome() == DecisionOutcome.REJECT) {
             return AuditAction.SOLICITATION_REJECTED;
         }
         return declared;
