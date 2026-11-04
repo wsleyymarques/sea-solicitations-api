@@ -61,7 +61,7 @@ class DecideSolicitationServiceTest {
         when(repository.findById(id)).thenReturn(Optional.of(solicitation));
         when(repository.save(solicitation)).thenReturn(id);
 
-        DecideSolicitationResult result = service.decide(command(id, analystId, DecisionOutcome.APPROVED, COMMENT));
+        DecideSolicitationResult result = service.decide(command(id, analystId, DecisionOutcome.APPROVE, COMMENT));
 
         assertThat(result.id()).isEqualTo(id);
         assertThat(result.status()).isEqualTo(SolicitationStatus.APPROVED);
@@ -81,7 +81,7 @@ class DecideSolicitationServiceTest {
         when(repository.save(solicitation)).thenReturn(id);
 
         DecideSolicitationResult result = service.decide(command(
-                id, analystId, DecisionOutcome.REJECTED, "Documentacao insuficiente."
+                id, analystId, DecisionOutcome.REJECT, "Documentacao insuficiente."
         ));
 
         assertThat(result.status()).isEqualTo(SolicitationStatus.REJECTED);
@@ -97,7 +97,7 @@ class DecideSolicitationServiceTest {
         when(repository.findById(id)).thenReturn(Optional.of(solicitation));
 
         assertThatThrownBy(() -> service.decide(new DecideSolicitationCommand(
-                id, analystId, Set.of(FederativeUnit.RJ), DecisionOutcome.APPROVED, COMMENT
+                id, analystId, Set.of(FederativeUnit.RJ), DecisionOutcome.APPROVE, COMMENT
         ))).isInstanceOf(SolicitationReviewAccessDeniedException.class);
 
         assertThat(solicitation.getDecision()).isNull();
@@ -111,7 +111,7 @@ class DecideSolicitationServiceTest {
         when(repository.findById(id)).thenReturn(Optional.of(solicitation));
 
         assertThatThrownBy(() -> service.decide(command(
-                id, UUID.randomUUID(), DecisionOutcome.APPROVED, COMMENT
+                id, UUID.randomUUID(), DecisionOutcome.APPROVE, COMMENT
         ))).isInstanceOf(SolicitationReviewAccessDeniedException.class);
 
         assertThat(solicitation.getDecision()).isNull();
@@ -127,7 +127,7 @@ class DecideSolicitationServiceTest {
         when(repository.findById(id)).thenReturn(Optional.of(solicitation));
 
         assertThatThrownBy(() -> service.decide(command(
-                id, analystId, DecisionOutcome.REJECTED, COMMENT
+                id, analystId, DecisionOutcome.REJECT, COMMENT
         ))).isInstanceOf(InvalidSolicitationStateException.class);
 
         assertThat(solicitation.getStatus()).isEqualTo(SolicitationStatus.APPROVED);
@@ -142,7 +142,7 @@ class DecideSolicitationServiceTest {
         when(repository.findById(id)).thenReturn(Optional.of(solicitation));
 
         assertThatThrownBy(() -> service.decide(command(
-                id, UUID.randomUUID(), DecisionOutcome.APPROVED, COMMENT
+                id, UUID.randomUUID(), DecisionOutcome.APPROVE, COMMENT
         ))).isInstanceOf(InvalidSolicitationStateException.class);
         verify(repository, never()).save(any(Solicitation.class));
     }
@@ -155,7 +155,7 @@ class DecideSolicitationServiceTest {
         when(repository.findById(id)).thenReturn(Optional.of(solicitation));
 
         assertThatThrownBy(() -> service.decide(command(
-                id, analystId, DecisionOutcome.APPROVED, "   curto   "
+                id, analystId, DecisionOutcome.APPROVE, "   curto   "
         ))).isInstanceOf(IllegalArgumentException.class);
 
         assertThat(solicitation.getStatus()).isEqualTo(SolicitationStatus.IN_REVIEW);
@@ -172,7 +172,7 @@ class DecideSolicitationServiceTest {
 
         for (String comment : new String[]{null, "      ", "x".repeat(1001)}) {
             assertThatThrownBy(() -> service.decide(command(
-                    id, analystId, DecisionOutcome.REJECTED, comment
+                    id, analystId, DecisionOutcome.REJECT, comment
             ))).isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -187,7 +187,7 @@ class DecideSolicitationServiceTest {
         when(repository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.decide(command(
-                id, UUID.randomUUID(), DecisionOutcome.APPROVED, COMMENT
+                id, UUID.randomUUID(), DecisionOutcome.APPROVE, COMMENT
         ))).isInstanceOf(SolicitationNotFoundException.class);
     }
 
@@ -200,7 +200,7 @@ class DecideSolicitationServiceTest {
         when(repository.save(solicitation)).thenThrow(new SolicitationConcurrentUpdateException());
 
         assertThatThrownBy(() -> service.decide(command(
-                id, analystId, DecisionOutcome.APPROVED, COMMENT
+                id, analystId, DecisionOutcome.APPROVE, COMMENT
         ))).isInstanceOf(SolicitationConcurrentUpdateException.class);
     }
 

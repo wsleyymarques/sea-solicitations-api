@@ -185,15 +185,15 @@ Os servicos ficarao disponiveis em:
 
 ## Testando pela tela e pelo Postman
 
-Para carregar contas prontas para teste, primeiro inicie o PostgreSQL:
+Para carregar usuarios prontos para teste, primeiro inicie o PostgreSQL:
 
 ```bash
 docker compose up --detach postgres
 ALLOW_TEST_SEED=1 bash scripts/seed-test-users.sh
 ```
 
-A seed e idempotente: cria as contas que ainda nao existem e atribui cobertura
-SP/RJ ao analista de teste. Ela exige `ALLOW_TEST_SEED=1` porque todas as contas
+A seed e idempotente: cria os usuarios que ainda nao existem e atribui cobertura
+SP/RJ ao analista de teste. Ela exige `ALLOW_TEST_SEED=1` porque todos os usuarios
 compartilham a senha de demonstracao `StrongPassword@123`; execute somente em
 banco local de teste. As credenciais sao:
 
@@ -216,7 +216,7 @@ sem alterar o CORS do backend. Para outra porta da API, defina
 `VITE_API_TARGET=http://localhost:PORTA` antes de `npm run dev`.
 O painel cobre cadastro e login do cliente, criacao e envio da solicitacao,
 login e cadastro de analista pelo administrador, lista, busca, inicio da
-analise e decisao. Para entrar com as contas seed, use o e-mail e a senha
+analise e decisao. Para entrar com os usuarios da seed, use o e-mail e a senha
 `StrongPassword@123` no formulario do perfil correspondente. Os tokens ficam
 apenas na memoria da aba e sao descartados
 ao recarregar a pagina. O ID da solicitacao e preenchido automaticamente ao
@@ -456,10 +456,10 @@ O analista que iniciou a analise pode aprovar ou rejeitar a solicitacao:
 curl --request POST http://localhost:8080/analyst/solicitations/<solicitationId>/decide \
   --header 'Authorization: Bearer <analystAccessToken>' \
   --header 'Content-Type: application/json' \
-  --data '{"outcome":"APPROVED","comment":"Parecer favoravel para atendimento."}'
+  --data '{"outcome":"APPROVE","comment":"Parecer favoravel para atendimento."}'
 ```
 
-Para rejeitar, envie `"outcome":"REJECTED"`. O comentario e obrigatorio e deve
+Para rejeitar, envie `"outcome":"REJECT"`. O comentario e obrigatorio e deve
 ter de 10 a 1000 caracteres depois de remover espacos nas extremidades. A
 resposta `200 OK` contem `id`, `status`, `analystId`, `comment` normalizado e
 `decidedAt`. Esses dados ficam persistidos com a solicitacao, permitindo
@@ -483,7 +483,7 @@ O analista pode pesquisar solicitacoes da sua cobertura:
 ```bash
 curl --get http://localhost:8080/analyst/solicitations/search \
   --header 'Authorization: Bearer <analystAccessToken>' \
-  --data-urlencode 'text=equipamento' \
+  --data-urlencode 'q=equipamento' \
   --data-urlencode 'status=SUBMITTED' \
   --data-urlencode 'state=SP' \
   --data-urlencode 'dateFrom=2026-11-01' \
@@ -493,13 +493,13 @@ curl --get http://localhost:8080/analyst/solicitations/search \
   --data-urlencode 'size=20'
 ```
 
-Filtros opcionais: `text` (titulo e descricao, ate 200 caracteres), `status`,
+Filtros opcionais: `q` (titulo e descricao, ate 200 caracteres), `status`,
 `serviceType`, `priority`, `state`, `dateFrom` e `dateTo`. As datas delimitam
 dias completos de submissao em UTC. A ordenacao usa `sort`
 (`SUBMITTED_AT`, `CREATED_AT` ou `PREFERRED_DATE`) e `direction` (`ASC` ou
 `DESC`); o padrao e `SUBMITTED_AT DESC`. `page` comeca em zero, `size` vai de
 `1` a `100`, e a janela solicitada deve caber nos primeiros 10.000 resultados.
-A resposta inclui `content`, `page`, `size`, `totalElements` e `totalPages`.
+A resposta inclui exatamente `items`, `page`, `size` e `total`.
 
 `submittedFrom`, `submittedTo` e `sortBy` permanecem como aliases de
 compatibilidade. Quando o nome canonico e o alias sao enviados juntos, o valor
@@ -511,7 +511,7 @@ restringe o resultado. Solicitacoes `SUBMITTED` aparecem na cobertura;
 Rascunhos nao aparecem. Cada resultado e conferido no PostgreSQL antes de ser
 devolvido, evitando que um documento antigo exponha uma solicitacao cuja
 atribuicao mudou. Se houver documentos atrasados, uma pagina pode ter menos
-itens que `size`, e `totalElements` ainda reflete a contagem do indice.
+itens que `size`, e `total` ainda reflete a contagem do indice.
 
 O indice `solicitations-v1` e criado com mapping na primeira operacao.
 Criacao, edicao, submissao, inicio de analise e decisao gravam a solicitacao e

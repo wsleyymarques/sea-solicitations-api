@@ -556,7 +556,7 @@
           }
         ],
         "url": {
-          "raw": "{{baseUrl}}/analyst/solicitations/search?state=SP&dateFrom=2020-01-01&dateTo=2099-12-31&sort=SUBMITTED_AT&direction=DESC&page=0&size=20",
+          "raw": "{{baseUrl}}/analyst/solicitations/search?q=equipamento&state=SP&dateFrom=2020-01-01&dateTo=2099-12-31&sort=SUBMITTED_AT&direction=DESC&page=0&size=20",
           "host": [
             "{{baseUrl}}"
           ],
@@ -566,6 +566,10 @@
             "search"
           ],
           "query": [
+            {
+              "key": "q",
+              "value": "equipamento"
+            },
             {
               "key": "state",
               "value": "SP"
@@ -604,7 +608,8 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "pm.test('Contrato do flyer', () => pm.expect(Object.keys(pm.response.json()).sort()).to.eql(['items','page','size','total'].sort()));"
             ]
           }
         }
@@ -677,7 +682,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\"outcome\":\"APPROVED\",\"comment\":\"Parecer favorável para atendimento.\"}",
+          "raw": "{\"outcome\":\"APPROVE\",\"comment\":\"Parecer favorável para atendimento.\"}",
           "options": {
             "raw": {
               "language": "json"
@@ -947,7 +952,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{\"outcome\":\"REJECTED\",\"comment\":\"Parecer desfavorável após análise do pedido.\"}",
+          "raw": "{\"outcome\":\"REJECT\",\"comment\":\"Parecer desfavorável após análise do pedido.\"}",
           "options": {
             "raw": {
               "language": "json"

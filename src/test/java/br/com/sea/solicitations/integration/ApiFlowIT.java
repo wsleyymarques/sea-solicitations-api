@@ -176,6 +176,8 @@ class ApiFlowIT {
                 .isEqualTo(HttpStatus.FORBIDDEN);
 
         UUID approvedId = createDraft(clientToken);
+        assertError(get("/analyst/solicitations/" + approvedId, assignedToken),
+                HttpStatus.FORBIDDEN, "SOLICITATION_REVIEW_ACCESS_DENIED");
         assertError(post("/solicitations/" + approvedId + "/submit", clientToken, null),
                 HttpStatus.CONFLICT, "INCOMPLETE_SOLICITATION");
         assertError(put("/solicitations/" + approvedId + "/address", otherClientToken,
@@ -193,12 +195,18 @@ class ApiFlowIT {
         assertError(get("/analyst/solicitations/" + approvedId, outsideCoverageToken),
                 HttpStatus.FORBIDDEN, "SOLICITATION_REVIEW_ACCESS_DENIED");
         ResponseEntity<JsonNode> canonicalSearch = get(
-                "/analyst/solicitations/search?state=RJ&dateFrom=2026-11-01"
+                "/analyst/solicitations/search?q=sem-resultados&state=RJ&dateFrom=2026-11-01"
                         + "&dateTo=2026-11-30&sort=CREATED_AT&direction=ASC",
                 assignedToken
         );
         assertThat(canonicalSearch.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(canonicalSearch.getBody().path("content").isEmpty()).isTrue();
+        JsonNode searchBody = canonicalSearch.getBody();
+        assertThat(searchBody.size()).isEqualTo(4);
+        assertThat(searchBody.path("items").isArray()).isTrue();
+        assertThat(searchBody.path("items").isEmpty()).isTrue();
+        assertThat(searchBody.path("page").asInt()).isZero();
+        assertThat(searchBody.path("size").asInt()).isEqualTo(20);
+        assertThat(searchBody.path("total").asLong()).isZero();
         assertError(post("/analyst/solicitations/" + approvedId + "/start",
                 outsideCoverageToken, null),
                 HttpStatus.FORBIDDEN, "SOLICITATION_REVIEW_ACCESS_DENIED");
@@ -213,12 +221,12 @@ class ApiFlowIT {
 
         String decisionPath = "/analyst/solicitations/" + approvedId + "/decide";
         Map<String, Object> approval = Map.of(
-                "outcome", "APPROVED", "comment", "Parecer favoravel para atendimento."
+                "outcome", "APPROVE", "comment", "Parecer favoravel para atendimento."
         );
         assertError(post(decisionPath, otherAnalystToken, approval),
                 HttpStatus.FORBIDDEN, "SOLICITATION_REVIEW_ACCESS_DENIED");
         assertError(post(decisionPath, assignedToken,
-                Map.of("outcome", "APPROVED", "comment", "curto")),
+                Map.of("outcome", "APPROVE", "comment", "curto")),
                 HttpStatus.BAD_REQUEST, "VALIDATION_ERROR");
         ResponseEntity<JsonNode> approved = post(decisionPath, assignedToken, approval);
         assertThat(approved.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -232,7 +240,7 @@ class ApiFlowIT {
                 assignedToken, null).getStatusCode()).isEqualTo(HttpStatus.OK);
         ResponseEntity<JsonNode> rejected = post(
                 "/analyst/solicitations/" + rejectedId + "/decision", assignedToken,
-                Map.of("outcome", "REJECTED", "comment", "Parecer desfavoravel apos analise."));
+                Map.of("outcome", "REJECT", "comment", "Parecer desfavoravel apos analise."));
         assertThat(rejected.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(rejected.getBody().path("status").asText()).isEqualTo("REJECTED");
 

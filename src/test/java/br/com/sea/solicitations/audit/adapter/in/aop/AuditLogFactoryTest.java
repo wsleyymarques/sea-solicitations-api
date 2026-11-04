@@ -57,7 +57,7 @@ class AuditLogFactoryTest {
 
         List<AuditLog> logs = factory.create(AuditAction.SOLICITATION_APPROVED,
                 new DecideSolicitationCommand(solicitation, analyst, Set.of(FederativeUnit.SP),
-                        DecisionOutcome.REJECTED, "private decision comment"),
+                        DecisionOutcome.REJECT, "private decision comment"),
                 null, new IllegalStateException("private failure message"));
 
         assertThat(logs).hasSize(1);
@@ -68,7 +68,7 @@ class AuditLogFactoryTest {
         assertThat(log.getResourceId()).isEqualTo(solicitation);
         assertThat(log.getRequestId()).isEqualTo("req-123");
         assertThat(log.getOccurredAt()).isEqualTo(NOW);
-        assertThat(log.getMetadata()).containsEntry("outcome", "REJECTED")
+        assertThat(log.getMetadata()).containsEntry("outcome", "REJECT")
                 .containsEntry("errorType", "IllegalStateException")
                 .doesNotContainKeys("comment", "message", "token");
         assertThat(log.getMetadata().toString()).doesNotContain("private");
@@ -125,7 +125,7 @@ class AuditLogFactoryTest {
 
         AuditLog log = factory.create(AuditAction.SOLICITATION_APPROVED,
                 new DecideSolicitationCommand(UUID.randomUUID(), analyst,
-                        Set.of(FederativeUnit.SP), DecisionOutcome.APPROVED, "private comment"),
+                        Set.of(FederativeUnit.SP), DecisionOutcome.APPROVE, "private comment"),
                 null, new IllegalStateException("failed")).getFirst();
 
         assertThat(log.getActorId()).isEqualTo(analyst);

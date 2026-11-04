@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ "${ALLOW_TEST_SEED:-}" != "1" ]]; then
-  echo 'This seed creates demo accounts with a shared test password.' >&2
+  echo 'This seed creates demo users with a shared test password.' >&2
   echo 'Run only against a local test database with ALLOW_TEST_SEED=1.' >&2
   exit 2
 fi
@@ -24,7 +24,7 @@ docker compose exec --no-TTY postgres \
 
 cat <<'INFO'
 
-Demo login for all three accounts:
+Credentials for all three demo users:
   Password: StrongPassword@123
   CLIENT:   cliente.teste@example.com
   ANALYST:  analista.teste@example.com (coverage: SP, RJ)
