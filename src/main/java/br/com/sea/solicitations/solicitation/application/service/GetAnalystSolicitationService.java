@@ -37,7 +37,7 @@ public class GetAnalystSolicitationService implements GetAnalystSolicitationUseC
             return false;
         }
         if (solicitation.getStatus() == SolicitationStatus.SUBMITTED) {
-            return solicitation.getAssignedAnalystId() == null;
+            return true;
         }
         return (solicitation.getStatus() == SolicitationStatus.IN_REVIEW
                 || solicitation.getStatus() == SolicitationStatus.APPROVED
