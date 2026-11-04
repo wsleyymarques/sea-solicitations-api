@@ -4,7 +4,7 @@
 
 API REST do desafio backend para gerenciamento de solicitacoes de atendimento.
 
-## Stack inicial
+## Tecnologias
 
 - Java 21
 - Spring Boot 3.5
@@ -14,6 +14,17 @@ API REST do desafio backend para gerenciamento de solicitacoes de atendimento.
 - Spring Security e JWT
 - Micrometer e Prometheus
 - OpenAPI/Swagger
+
+## Pre-requisitos
+
+- Docker com o plugin Compose para subir a API e os servicos locais.
+- OpenSSL para gerar `JWT_SECRET`.
+- JDK 21 para executar Maven ou a API diretamente no computador. O ambiente
+  completo pelo Docker Compose nao exige Java instalado no host.
+- Node.js 22 e npm para usar o painel de teste em `frontend/`.
+- Python 3 para regenerar os arquivos Postman; `htpasswd` para criar o primeiro
+  administrador pelo script de bootstrap. A seed de usuarios de teste nao exige
+  `htpasswd`.
 
 ## Arquitetura
 
@@ -115,11 +126,6 @@ artifact por sete dias, sem transformar a ausencia de relatorios em uma nova
 falha. As actions oficiais sao fixadas por SHA e o `GITHUB_TOKEN` possui apenas
 permissao de leitura do conteudo do repositorio.
 
-Depois que o workflow estiver na branch `main`, um ruleset do GitHub pode exigir
-o status do job `verify` antes de permitir o merge. A configuracao fica em
-`Settings > Rules > Rulesets` e transforma o CI em uma barreira efetiva contra
-codigo que nao compila, testes quebrados ou imagens Docker que nao constroem.
-
 ## Ambiente com Docker Compose
 
 Crie o arquivo local de variaveis de ambiente:
@@ -183,6 +189,12 @@ Os servicos ficarao disponiveis em:
 - OpenAPI: `http://localhost:8080/v3/api-docs`
 - Swagger UI: `http://localhost:8080/swagger-ui.html`
 
+Esses enderecos usam os valores padrao do Compose. Se alterar `APP_PORT`,
+`POSTGRES_PORT` ou `ELASTICSEARCH_PORT` no `.env`, use as portas correspondentes.
+Atualize tambem `baseUrl` no Postman quando `APP_PORT` mudar. Ao executar a API
+diretamente com Maven, a porta da API e controlada por `SERVER_PORT` (padrao
+`8080`), independentemente de `APP_PORT`.
+
 ## Testando pela tela e pelo Postman
 
 Para carregar usuarios prontos para teste, primeiro inicie o PostgreSQL:
@@ -225,13 +237,14 @@ criar; tambem pode ser colado manualmente.
 Para testar no Postman, importe
 [`postman/sea-solicitacoes.postman_collection.json`](postman/sea-solicitacoes.postman_collection.json)
 e [`postman/sea-local.postman_environment.json`](postman/sea-local.postman_environment.json).
-Selecione o ambiente local e preencha `adminEmail` e `adminPassword` com as
-credenciais do primeiro administrador. Crie essa conta pelo
-`scripts/bootstrap-admin.sh` se ainda nao existir. Execute a colecao na
+Selecione o ambiente local e preencha `adminEmail` e `adminPassword` com o
+administrador da seed acima (`admin.teste@example.com` e
+`StrongPassword@123`) ou com o administrador criado pelo
+`scripts/bootstrap-admin.sh` em um banco sem administrador. Execute a colecao na
 ordem numerada. Ela gera e-mails de teste exclusivos, captura tokens e ID da
 solicitacao automaticamente e verifica os codigos e estados principais,
 incluindo aprovacao e rejeicao em pedidos diferentes.
-A busca usa indexacao assincrona; execute novamente a requisicao 11 se o
+A busca usa indexacao assincrona; execute novamente a requisicao 12 se o
 registro ainda nao aparecer. O arquivo de ambiente nao contem senha real.
 Para regenerar os arquivos Postman apos alterar os contratos, execute
 `python3 scripts/generate-postman.py`.
@@ -270,6 +283,8 @@ Authorization: Bearer <accessToken>
 
 O JWT e assinado com HS256 e contem o ID do usuario em `sub`, alem das claims
 `role` e `coveredStates`. A aplicacao nao cria sessao no servidor.
+Substitua os valores entre `<...>` nos exemplos pelos tokens e IDs retornados
+pela API.
 
 ### Primeiro administrador local
 
@@ -283,8 +298,10 @@ scripts/bootstrap-admin.sh admin@example.com
 
 O script pede a senha duas vezes, gera um hash BCrypt com custo 12 usando
 `htpasswd` e insere o primeiro usuario `ADMIN`. Nenhuma senha ou hash fixo fica
-no repositorio. Se ja existir um administrador, a seed nao altera sua conta ou
-senha. Se o e-mail pertencer a um cliente ou analista, a insercao falha.
+no repositorio. Se ja existir um administrador, o bootstrap nao altera sua conta
+ou senha nem cria outro administrador. Isso tambem vale se voce ja executou a
+seed de usuarios de teste acima. Se ainda nao houver administrador e o e-mail
+pertencer a um cliente ou analista, a insercao falha.
 
 O comando requer `docker` e `htpasswd` no computador local. Depois, use
 `POST /auth/login` com esse e-mail e senha para obter um token de administrador.
@@ -318,9 +335,12 @@ ja utilizado retorna `409`; tokens sem papel `ADMIN` recebem `403`.
 
 A resposta `201 Created` contem `id`, `name`, `email`, `role` e
 `coveredStates`. A senha e seu hash nunca sao devolvidos. O primeiro
-administrador continua sendo criado pelo bootstrap local descrito acima.
+administrador pode ser criado pelo bootstrap local ou pela seed de teste.
 
 ## Solicitacoes
+
+Nos exemplos abaixo, substitua `<solicitationId>` pelo `id` retornado na
+criacao.
 
 Crie a solicitacao com os dados basicos usando um token de `CLIENT`:
 
@@ -340,7 +360,7 @@ numero e complemento; logradouro, bairro, cidade e UF sao consultados no
 ViaCEP e nao podem ser substituidos pelo corpo da requisicao:
 
 ```bash
-curl --request PUT http://localhost:8080/solicitations/<solicitationId>/address \
+curl --request PUT 'http://localhost:8080/solicitations/<solicitationId>/address' \
   --header 'Authorization: Bearer <accessToken>' \
   --header 'Content-Type: application/json' \
   --data '{
@@ -363,7 +383,7 @@ A integracao usa, por padrao, `https://viacep.com.br`, timeout de conexao de
 Depois do endereco, complete a confirmacao:
 
 ```bash
-curl --request PUT http://localhost:8080/solicitations/<solicitationId>/confirmation \
+curl --request PUT 'http://localhost:8080/solicitations/<solicitationId>/confirmation' \
   --header 'Authorization: Bearer <accessToken>' \
   --header 'Content-Type: application/json' \
   --data '{
@@ -384,7 +404,7 @@ a confirmacao repetindo o `PUT`.
 Quando as tres etapas estiverem completas, envie a solicitacao:
 
 ```bash
-curl --request POST http://localhost:8080/solicitations/<solicitationId>/submit \
+curl --request POST 'http://localhost:8080/solicitations/<solicitationId>/submit' \
   --header 'Authorization: Bearer <accessToken>'
 ```
 
@@ -419,7 +439,7 @@ valores de `1` a `100`.
 Para consultar todos os dados de uma solicitacao visivel, use o detalhe:
 
 ```bash
-curl --request GET http://localhost:8080/analyst/solicitations/<solicitationId> \
+curl --request GET 'http://localhost:8080/analyst/solicitations/<solicitationId>' \
   --header 'Authorization: Bearer <analystAccessToken>'
 ```
 
@@ -433,7 +453,7 @@ Um analista pode iniciar a analise de uma solicitacao submetida cuja UF esteja
 em sua cobertura:
 
 ```bash
-curl --request POST http://localhost:8080/analyst/solicitations/<solicitationId>/start \
+curl --request POST 'http://localhost:8080/analyst/solicitations/<solicitationId>/start' \
   --header 'Authorization: Bearer <analystAccessToken>'
 ```
 
@@ -453,7 +473,7 @@ responde `409 INVALID_SOLICITATION_STATE`; atualizacoes concorrentes respondem
 O analista que iniciou a analise pode aprovar ou rejeitar a solicitacao:
 
 ```bash
-curl --request POST http://localhost:8080/analyst/solicitations/<solicitationId>/decide \
+curl --request POST 'http://localhost:8080/analyst/solicitations/<solicitationId>/decide' \
   --header 'Authorization: Bearer <analystAccessToken>' \
   --header 'Content-Type: application/json' \
   --data '{"outcome":"APPROVE","comment":"Parecer favoravel para atendimento."}'
@@ -486,8 +506,6 @@ curl --get http://localhost:8080/analyst/solicitations/search \
   --data-urlencode 'q=equipamento' \
   --data-urlencode 'status=SUBMITTED' \
   --data-urlencode 'state=SP' \
-  --data-urlencode 'dateFrom=2026-11-01' \
-  --data-urlencode 'dateTo=2026-11-30' \
   --data-urlencode 'sort=SUBMITTED_AT' \
   --data-urlencode 'page=0' \
   --data-urlencode 'size=20'
